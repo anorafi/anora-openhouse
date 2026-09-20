@@ -122,3 +122,11 @@ Chrome window with an injected wallet; see its header for the env vars
 - OpenZeppelin 5.7: `Clones` for facilities, `SafeERC20`, `ReentrancyGuard`, `Initializable`, `Ownable2Step`, `Pausable`.
 - 26 Foundry tests including a fuzz test that checks the waterfall never creates or loses capital (`testFuzz_waterfallConservesCapital`).
 - Slither (`uvx --from slither-analyzer slither . --filter-paths "lib/|test/|script/"`) reports no high or medium findings. Remaining informational items are intentional: late fees accrue per whole day (`divide-before-multiply`), and due dates, grace periods and late fees are timestamp based by design (`timestamp`).
+
+## apps/keeper
+
+Permissionless watcher. Every minute it reads every facility from the factories in `contracts/deployments.json` (Robinhood Chain and Arbitrum Sepolia), and calls `markLate()` on any Open facility whose principal is past its due date. Anyone can call `markLate`, so the keeper holds no privilege; it only makes sure nobody has to. Runs on the VPS as the `anora-keeper` systemd user unit; `bun run test:keeper` covers the selection rule.
+
+```
+KEEPER_PRIVATE_KEY=0x... bun run keeper
+```
