@@ -7,8 +7,8 @@ export function useDeployment(): Deployment | undefined {
   return deploymentFor(chainId);
 }
 
-export function usePoolAddress(): Address | undefined {
-  return useDeployment()?.pool ?? undefined;
+export function useFactoryAddress(): Address | undefined {
+  return useDeployment()?.factory;
 }
 
 export function useAssetAddress(): Address | undefined {

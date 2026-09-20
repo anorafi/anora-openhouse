@@ -3,7 +3,7 @@ import rawDeployments from "../../../../contracts/deployments.json";
 
 export interface Deployment {
   chainId: number;
-  pool: Address | null;
+  factory: Address;
   asset: Address;
   assetSymbol: string;
   faucet: boolean;
@@ -15,7 +15,7 @@ interface RawDeployment {
   asset: string;
   assetSymbol: string;
   faucet: boolean;
-  AnoraPool: string | null;
+  AnoraFactory: string;
   explorer: string;
 }
 
@@ -24,7 +24,7 @@ const deploymentsByChainId: Record<number, Deployment> = Object.fromEntries(
     entry.chainId,
     {
       chainId: entry.chainId,
-      pool: entry.AnoraPool as Address | null,
+      factory: entry.AnoraFactory as Address,
       asset: entry.asset as Address,
       assetSymbol: entry.assetSymbol,
       faucet: entry.faucet,

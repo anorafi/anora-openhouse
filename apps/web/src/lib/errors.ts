@@ -2,9 +2,10 @@ import { BaseError, ContractFunctionRevertedError } from "viem";
 
 const REVERT_MESSAGES: Record<string, string> = {
   SeniorCapacityExceeded: "Senior tranche capacity is full; deposit into Junior first or deposit a smaller amount.",
+  CapitalCapExceeded: "This deposit would exceed the facility's capital cap.",
   FirstLossTooSmall: "First-loss stake is below the policy minimum for this credit limit.",
   LimitExceeded: "This drawdown would exceed the facility's credit limit.",
-  InsufficientLiquidity: "The pool does not have enough free liquidity for this right now.",
+  InsufficientLiquidity: "The facility does not have enough free liquidity for this right now.",
   NotOriginator: "Only the facility's originator can do this.",
   FacilityNotOpen: "This facility is not open (it may be late, defaulted, or closed).",
   NotPastDue: "This facility is not past its due date yet.",
