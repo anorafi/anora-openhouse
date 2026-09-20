@@ -30,7 +30,7 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .network-pill { display: flex; align-items: center; gap: 10px; padding: 0 15px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); }
 .network-pill.active { color: var(--ink); background: var(--accent-soft); border-color: var(--accent-dark); }
 .asset-pill { padding: 4px 9px; color: var(--accent-ink); background: var(--accent-soft); border-radius: 5px; font-size: 11px; font-weight: 700; }
-.pool-link { color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.factory-link { color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
 .connect-button { padding: 0 20px; color: #fff; background: var(--fill); border: 1px solid var(--fill); font-weight: 600; }
 .connect-button:hover, .primary-button:hover:not(:disabled) { background: #30343a; border-color: #30343a; }
 .account-pill { display: flex; align-items: center; gap: 9px; padding: 0 10px 0 14px; color: #fff; background: var(--fill); border: 1px solid var(--fill); border-radius: 7px; }
@@ -263,7 +263,37 @@ progress::-moz-progress-bar { background: var(--fill); border-radius: 999px; }
 .activity-filters button { min-height: 44px; padding: 0 20px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; font-size: 13px; font-weight: 600; }
 .activity-filters button.active { background: var(--accent-soft); border-color: var(--accent-dark); }
 .activity-table { padding: 0 22px; }
-.activity-table .table-head, .activity-row { grid-template-columns: .6fr 1.2fr 1.6fr 1fr .8fr .5fr; }
+.activity-table .table-head, .activity-row { grid-template-columns: .7fr 1fr 1.3fr 1.7fr .5fr; }
+.positions-table .table-head, .positions-table .table-row { grid-template-columns: 1.4fr .9fr .9fr .9fr .9fr .5fr; }
+
+.market-status.late { color: var(--warning); background: var(--warning-soft); border-color: #f0d9a8; }
+.market-status.defaulted { color: var(--danger); background: var(--danger-soft); border-color: #f3c4c0; }
+.market-status.closed { color: var(--muted); background: var(--bg); border-color: var(--line); }
+
+.originate-page, .risk-page { display: grid; gap: 16px; }
+.originate-page .panel, .risk-page .panel { margin-top: 4px; }
+.originate-page .panel + .panel { margin-top: 16px; }
+.form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 18px; margin: 18px 0; }
+.form-grid label, .originate-page label, .risk-page label { display: grid; gap: 6px; color: var(--ink); font-size: 12px; font-weight: 650; }
+.form-grid input, .originate-page input[type="text"], .risk-page input[type="text"], .risk-page textarea, .originate-page textarea {
+  min-height: 42px; padding: 0 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 7px; font: inherit;
+}
+.originate-page textarea, .risk-page textarea { min-height: 64px; padding: 10px 12px; width: 100%; resize: vertical; }
+.form-block { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.form-block h3 { margin: 0 0 10px; font-size: 14px; }
+.card-list { display: grid; gap: 14px; margin-top: 14px; }
+.card { padding: 18px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; }
+.card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.card-title { font-weight: 700; font-size: 15px; }
+.card .row { margin: 10px 0; }
+.card .row input[type="text"] { flex: 1; min-width: 160px; }
+.error { display: block; margin-top: 8px; color: var(--danger); font-size: 12px; }
+.btn-primary { color: #fff; background: var(--fill); border-color: var(--fill); }
+.btn-primary:hover:not(:disabled) { background: #30343a; border-color: #30343a; }
+.btn-danger { color: #fff; background: var(--danger); border-color: var(--danger); }
+.btn-danger:hover:not(:disabled) { background: #921c10; border-color: #921c10; }
+.loss-breakdown { margin: 10px 0; padding: 12px 14px; background: var(--danger-soft); border: 1px solid #f3c4c0; border-radius: 7px; font-size: 12px; }
+.loss-breakdown p { margin: 4px 0; }
 
 @media (max-width: 900px) {
   .opportunity-layout, .analytics-grid { grid-template-columns: 1fr; }
@@ -273,4 +303,5 @@ progress::-moz-progress-bar { background: var(--fill); border-radius: 999px; }
   .positions-panel { overflow-x: auto; }
   .positions-table { min-width: 900px; }
   .portfolio-insights { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
 }

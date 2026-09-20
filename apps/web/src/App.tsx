@@ -1,35 +1,64 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "./components/Header";
 import { Markets } from "./components/Markets";
-import { Activity, Opportunity, Portfolio } from "./components/InvestorPages";
+import { Opportunity } from "./components/Opportunity";
+import { Portfolio } from "./components/Portfolio";
+import { Activity } from "./components/Activity";
+import { Originate } from "./components/Originate";
+import { Risk } from "./components/Risk";
 import { NotDeployed } from "./components/NotDeployed";
 import { useDeployment } from "./hooks/useDeployment";
-
-export type Page = "markets" | "opportunity" | "portfolio" | "activity";
+import { parseHash, routeToHash, type Route } from "./lib/route";
 
 export function App() {
   const deployment = useDeployment();
-  const initialPage = window.location.hash.slice(1) as Page;
-  const [page, setPage] = useState<Page>(["markets", "opportunity", "portfolio", "activity"].includes(initialPage) ? initialPage : "markets");
+  const [route, setRoute] = useState<Route>(() => parseHash(window.location.hash));
   const [notice, setNotice] = useState<string | null>(null);
 
-  const navigate = (next: Page) => {
-    setPage(next);
-    window.location.hash = next;
+  useEffect(() => {
+    const onHashChange = () => setRoute(parseHash(window.location.hash));
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  const navigate = (next: Route) => {
     setNotice(null);
+    window.location.hash = routeToHash(next);
+    setRoute(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
     <div className="app">
-      <Header page={page} onNavigate={navigate} />
+      <Header page={route.page} onNavigate={(page) => navigate({ page } as Route)} />
       <main className="main">
-        {!deployment?.pool ? <NotDeployed /> : <>
-          {page === "markets" && <Markets onReview={() => navigate("opportunity")} />}
-          {page === "opportunity" && <Opportunity onBack={() => navigate("markets")} onComplete={() => { navigate("portfolio"); setNotice("Capital supplied successfully."); }} />}
-          {page === "portfolio" && <Portfolio notice={notice} onView={() => navigate("opportunity")} onActivity={() => navigate("activity")} />}
-          {page === "activity" && <Activity />}
-        </>}
+        {!deployment ? (
+          <NotDeployed />
+        ) : (
+          <>
+            {route.page === "markets" && <Markets onReview={(facility) => navigate({ page: "opportunity", facility })} />}
+            {route.page === "opportunity" && (
+              <Opportunity
+                facility={route.facility}
+                onBack={() => navigate({ page: "markets" })}
+                onComplete={() => {
+                  navigate({ page: "portfolio" });
+                  setNotice("Capital supplied successfully.");
+                }}
+              />
+            )}
+            {route.page === "portfolio" && (
+              <Portfolio
+                notice={notice}
+                onView={(facility) => navigate({ page: "opportunity", facility })}
+                onActivity={() => navigate({ page: "activity" })}
+              />
+            )}
+            {route.page === "activity" && <Activity />}
+            {route.page === "originate" && <Originate onView={(facility) => navigate({ page: "opportunity", facility })} />}
+            {route.page === "risk" && <Risk />}
+          </>
+        )}
       </main>
     </div>
   );
