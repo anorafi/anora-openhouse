@@ -979,5 +979,10 @@ export const AnoraFacilityAbi = [
     "type": "error",
     "name": "SeniorCapacityExceeded",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
   }
 ] as const;

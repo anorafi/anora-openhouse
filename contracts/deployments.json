@@ -2,14 +2,15 @@
   "arbitrumSepolia": {
     "chainId": 421614,
     "deployedAt": "2026-09-20",
-    "asset": "0xafEA33B071474eCdE4cBDC3aDBd80D18655A3A4a",
+    "asset": "0x38513243bA873d05b8b1E6622fE12e7685E4eAc6",
     "assetSymbol": "TestUSDC",
     "faucet": true,
-    "AnoraFactory": "0x04f037908F2BdFdD75363E5eBc5F46f6b5834d22",
-    "AnoraFacilityImplementation": "0x77BE4BF603d295AD3A2A7C9Eb29F38b3049EFf89",
+    "AnoraFactory": "0xDD4977E7D6249d0c5035Ed55DB1c710Fec4E9707",
+    "AnoraFacilityImplementation": "0x58D4b3A476Bf7033661277432b0B96716011a02f",
     "initialRiskAgent": "0x07dF8cd6D20b71ba7F16309d2844B88d1043fFfB",
     "minFirstLossBps": 1000,
-    "explorer": "https://sepolia.arbiscan.io"
+    "explorer": "https://sepolia.arbiscan.io",
+    "note": "commit 055a7cd with zero-address checks"
   },
   "robinhood": {
     "chainId": 4663,
@@ -22,6 +23,7 @@
     "AnoraFactory": "0x9300dbB89FC8a64dcD61511c9d17f5B5eF3E039b",
     "AnoraFacilityImplementation": "0x997Ba1d35832B8C97C3F01125A6C9dDE0Df6f58d",
     "initialRiskAgent": "0x07dF8cd6D20b71ba7F16309d2844B88d1043fFfB",
-    "minFirstLossBps": 1000
+    "minFirstLossBps": 1000,
+    "note": "commit ddeb269, predates zero-address checks; redeploy pending ETH top-up"
   }
 }

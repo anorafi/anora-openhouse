@@ -19,9 +19,9 @@ Arbitrum Sepolia.
 
 | Contract | Arbitrum Sepolia |
 |---|---|
-| AnoraFactory | [`0x04f037908F2BdFdD75363E5eBc5F46f6b5834d22`](https://sepolia.arbiscan.io/address/0x04f037908F2BdFdD75363E5eBc5F46f6b5834d22) |
-| AnoraFacility (implementation) | [`0x77BE4BF603d295AD3A2A7C9Eb29F38b3049EFf89`](https://sepolia.arbiscan.io/address/0x77BE4BF603d295AD3A2A7C9Eb29F38b3049EFf89) |
-| TestUSDC | [`0xafEA33B071474eCdE4cBDC3aDBd80D18655A3A4a`](https://sepolia.arbiscan.io/address/0xafEA33B071474eCdE4cBDC3aDBd80D18655A3A4a) |
+| AnoraFactory | [`0xDD4977E7D6249d0c5035Ed55DB1c710Fec4E9707`](https://sepolia.arbiscan.io/address/0xDD4977E7D6249d0c5035Ed55DB1c710Fec4E9707) |
+| AnoraFacility (implementation) | [`0x58D4b3A476Bf7033661277432b0B96716011a02f`](https://sepolia.arbiscan.io/address/0x58D4b3A476Bf7033661277432b0B96716011a02f) |
+| TestUSDC | [`0x38513243bA873d05b8b1E6622fE12e7685E4eAc6`](https://sepolia.arbiscan.io/address/0x38513243bA873d05b8b1E6622fE12e7685E4eAc6) |
 
 Monorepo, Bun workspaces.
 
