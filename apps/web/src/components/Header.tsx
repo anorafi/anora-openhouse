@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { arbitrumSepolia } from "wagmi/chains";
 import { AddressLink } from "./AddressLink";
@@ -5,21 +6,32 @@ import { robinhood } from "../config/wagmi";
 import { useDeployment } from "../hooks/useDeployment";
 import { useIsRiskAgent } from "../hooks/useFactory";
 import { shortenAddress } from "../lib/format";
-import type { Page } from "../lib/route";
 
-const SELECTABLE_CHAINS = [
-  { id: arbitrumSepolia.id, name: "Arbitrum Sepolia" },
-  { id: robinhood.id, name: "Robinhood Chain" },
-];
+const SELECTABLE_CHAINS = [{ id: robinhood.id, name: "Robinhood Chain" }, { id: arbitrumSepolia.id, name: "Arbitrum Sepolia" }];
 
-const NAV_ITEMS: { page: Page; label: string }[] = [
-  { page: "markets", label: "Markets" },
-  { page: "portfolio", label: "Portfolio" },
-  { page: "activity", label: "Activity" },
-  { page: "originate", label: "Originator" },
-];
+/** Close an open popover when the next click lands outside it. */
+function useDismiss(open: boolean, setOpen: (open: boolean) => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open, setOpen]);
+  return ref;
+}
 
-export function Header({ page, onNavigate }: { page: Page; onNavigate: (page: Page) => void }) {
+function Chevron() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+      <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function Header({ onReset }: { onReset: () => void }) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { connect, connectors, isPending: isConnecting } = useConnect();
@@ -27,49 +39,60 @@ export function Header({ page, onNavigate }: { page: Page; onNavigate: (page: Pa
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const isRiskAgent = useIsRiskAgent(address);
   const deployment = useDeployment();
-  const isSupportedChain = SELECTABLE_CHAINS.some((chain) => chain.id === chainId);
+  const currentChain = SELECTABLE_CHAINS.find((chain) => chain.id === chainId);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useDismiss(menuOpen, setMenuOpen);
+  const [resetOpen, setResetOpen] = useState(false);
+  const resetRef = useDismiss(resetOpen, setResetOpen);
 
   const injectedConnector = connectors.find((c) => c.type === "injected") ?? connectors[0];
 
   return (
     <header className="header">
-      <span className="brand-name">Anora</span>
-      <nav className="primary-nav" aria-label="Primary navigation">
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.page}
-            className={page === item.page || (item.page === "markets" && page === "opportunity") ? "active" : ""}
-            onClick={() => onNavigate(item.page)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
       <div className="header-actions">
-        <div className="network-select">
-          {SELECTABLE_CHAINS.map((chain) => (
-            <button
-              key={chain.id}
-              className={chain.id === chainId ? "network-pill active" : "network-pill"}
-              disabled={isSwitching || !isConnected}
-              onClick={() => switchChain({ chainId: chain.id })}
-            >
-              {chain.name}
-            </button>
-          ))}
+        <div className="reset-select" ref={resetRef}>
+          <button type="button" className="reset-button" onClick={() => setResetOpen((open) => !open)} aria-haspopup="menu" aria-expanded={resetOpen}>
+            Reset
+          </button>
+          {resetOpen && (
+            <div className="reset-menu" role="menu">
+              <strong>Reset the demo</strong>
+              <p>Clears everything you have supplied, drawn, repaid, claimed, and opened, and restores the book a first-time visitor sees.</p>
+              <div className="reset-actions">
+                <button role="menuitem" className="secondary-button" onClick={() => setResetOpen(false)}>Cancel</button>
+                <button role="menuitem" className="primary-button" onClick={() => { onReset(); setResetOpen(false); }}>Reset</button>
+              </div>
+            </div>
+          )}
         </div>
-        {isConnected && !isSupportedChain && <span className="btn-warn">Unsupported network</span>}
-        {deployment && (
-          <>
-            <span className="asset-pill">{deployment.assetSymbol}</span>
-            <AddressLink className="factory-link" address={deployment.factory} />
-          </>
-        )}
+        <div className="network-select" ref={menuRef}>
+          <button type="button" className="network-current" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={menuOpen}>
+            <span className="network-dot" aria-hidden="true" />
+            {currentChain ? currentChain.name : "Unsupported network"}
+            <span className="chev"><Chevron /></span>
+          </button>
+          {menuOpen && (
+            <div className="network-menu" role="menu">
+              {SELECTABLE_CHAINS.filter((chain) => chain.id !== chainId).map((chain) => (
+                <button
+                  key={chain.id}
+                  role="menuitem"
+                  disabled={isSwitching || !isConnected}
+                  onClick={() => { switchChain({ chainId: chain.id }); setMenuOpen(false); }}
+                >
+                  Switch to {chain.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {isConnected && !currentChain && <span className="btn-warn">Unsupported network</span>}
+        {deployment && <AddressLink className="pool-link" address={deployment.factory} />}
         {isConnected && address ? (
           <div className="account-pill">
             {isRiskAgent && <span className="badge badge-risk">risk agent</span>}
             <span className="address">{shortenAddress(address)}</span>
-            <button className="account-menu" aria-label="Disconnect wallet" onClick={() => disconnect()}>⌄</button>
+            <button className="account-menu" aria-label="Disconnect wallet" onClick={() => disconnect()}><Chevron /></button>
           </div>
         ) : (
           <button

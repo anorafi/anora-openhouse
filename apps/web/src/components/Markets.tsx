@@ -1,148 +1,148 @@
 import { useMemo, useState } from "react";
-import type { Address } from "viem";
-import { AddressLink } from "./AddressLink";
-import { StatusBadge } from "./StatusBadge";
-import { useDeployment } from "../hooks/useDeployment";
-import { useAllFacilityAddresses } from "../hooks/useFactory";
-import { useFacilities, type FacilityData, type FacilityStatusName } from "../hooks/useFacilities";
-import { bpsToPct, toPct } from "../lib/facility";
-import { formatDuration, formatUsdc } from "../lib/format";
+import { FilterBar, presentOptions } from "./FilterBar";
+import { facilityAsMarket, owedOn, useDemo, type Facility } from "../state/demo";
 
-const STATUS_FILTERS: ("All" | FacilityStatusName)[] = ["All", "Open", "Late", "Defaulted", "Closed"];
+export type MarketStatus = "Open" | "Funding" | "Active" | "Paused" | "Repaid" | "Settled" | "Defaulted" | "Recovered" | "Closed";
+export type Market = { name: string; type: string; route: string; company: string; icon: string; asset: string; status: MarketStatus; targetReturn: string; available: string; duration: string; reserve: string; funded: number };
 
-export function Markets({ onReview }: { onReview: (facility: Address) => void }) {
-  const deployment = useDeployment();
-  const { data: addresses, isLoading: isLoadingAddresses, error } = useAllFacilityAddresses();
-  const { facilities } = useFacilities(addresses);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"All" | FacilityStatusName>("All");
-  const [view, setView] = useState<"grid" | "list">("grid");
+const categories = ["All", "Export receivables", "Supply-chain finance", "Commodity finance"];
+type TabVariant = "all" | "export" | "supply" | "commodity";
+const categoryIcon: Record<string, TabVariant> = { "All": "all", "Export receivables": "export", "Supply-chain finance": "supply", "Commodity finance": "commodity" };
 
-  const visible = useMemo(
-    () =>
-      facilities.filter(
-        (f) =>
-          `${f.name} ${f.originator}`.toLowerCase().includes(query.toLowerCase()) &&
-          (status === "All" || f.statusName === status),
-      ),
-    [facilities, query, status],
-  );
+function TabIcon({ variant }: { variant: TabVariant }) {
+  switch (variant) {
+    case "all":
+      return (
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+          <circle cx="2.5" cy="2.5" r="1.6" /><circle cx="9.5" cy="2.5" r="1.6" />
+          <circle cx="2.5" cy="9.5" r="1.6" /><circle cx="9.5" cy="9.5" r="1.6" />
+        </svg>
+      );
+    case "export":
+      return (
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <path d="M3 9L9 3M9 3H4.5M9 3V7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case "supply":
+      return (
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <circle cx="4" cy="6" r="2.7" stroke="currentColor" strokeWidth="1.3" />
+          <circle cx="8" cy="6" r="2.7" stroke="currentColor" strokeWidth="1.3" />
+        </svg>
+      );
+    case "commodity":
+      return (
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <rect x="1.5" y="2.5" width="9" height="7" rx="1" stroke="currentColor" strokeWidth="1.3" />
+          <path d="M1.5 5.5H10.5" stroke="currentColor" strokeWidth="1.3" />
+        </svg>
+      );
+  }
+}
 
-  const totalCapital = facilities.reduce((sum, f) => sum + f.totalCapital, 0n);
-  const activeCount = facilities.filter((f) => f.statusName === "Open" || f.statusName === "Late").length;
-  const defaultedCount = facilities.filter((f) => f.statusName === "Defaulted").length;
-
+function MarketsBackdrop() {
   return (
-    <section className="markets-page">
-      <div className="markets-heading">
-        <div>
-          <h1>Markets</h1>
-          <p>Supply capital to isolated trade-finance facilities.</p>
-        </div>
-        <dl className="market-summary">
-          <div>
-            <dt>Capital supplied</dt>
-            <dd>
-              {formatUsdc(totalCapital)} {deployment?.assetSymbol}
-            </dd>
-          </div>
-          <div>
-            <dt>Active facilities</dt>
-            <dd>{activeCount}</dd>
-          </div>
-          <div>
-            <dt>Defaulted</dt>
-            <dd>{defaultedCount}</dd>
-          </div>
-          <div>
-            <dt>Total facilities</dt>
-            <dd>{facilities.length}</dd>
-          </div>
-        </dl>
-      </div>
-      <div className="market-filters">
-        <label className="market-search">
-          <span aria-hidden="true">⌕</span>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search facility or originator address…" />
-        </label>
-        <span className="asset-pill">{deployment?.assetSymbol}</span>
-        <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value as "All" | FacilityStatusName)}>
-          {STATUS_FILTERS.map((item) => (
-            <option key={item}>{item}</option>
-          ))}
-        </select>
-        <div className="view-toggle" aria-label="View">
-          <button className={view === "grid" ? "active" : ""} aria-label="Grid view" onClick={() => setView("grid")}>▦</button>
-          <button className={view === "list" ? "active" : ""} aria-label="List view" onClick={() => setView("list")}>☷</button>
-        </div>
-      </div>
-      {error && <p className="error">Could not load facilities: {error.message}</p>}
-      {isLoadingAddresses && <p className="muted">Loading facilities...</p>}
-      <div className={`market-cards ${view}`}>
-        {visible.map((facility) => (
-          <MarketCard key={facility.address} facility={facility} onReview={onReview} />
-        ))}
-      </div>
-      {!isLoadingAddresses && visible.length === 0 && <p className="empty-state">No facilities match these filters.</p>}
-      <p className="market-note">
-        <span aria-hidden="true">ⓘ</span> Each facility is isolated. Performance and losses do not transfer between facilities.
-      </p>
-    </section>
+    <svg className="markets-bg" aria-hidden="true" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="mktBlobAccent" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#dff23c" stopOpacity="0.65" />
+          <stop offset="100%" stopColor="#dff23c" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="mktBlobWhite" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle className="mkt-blob mkt-blob-a" cx="220" cy="140" r="280" fill="url(#mktBlobAccent)" />
+      <circle className="mkt-blob mkt-blob-b" cx="960" cy="90" r="320" fill="url(#mktBlobWhite)" />
+      <circle className="mkt-blob mkt-blob-c" cx="640" cy="460" r="260" fill="url(#mktBlobAccent)" />
+    </svg>
   );
 }
 
-function MarketCard({ facility, onReview }: { facility: FacilityData; onReview: (facility: Address) => void }) {
-  const utilization = facility.terms.capitalCap === 0n ? 0 : toPct(facility.totalCapital, facility.terms.capitalCap);
+const STATUS_ORDER = ["Open", "Funding", "Active", "Paused", "Repaid", "Settled", "Defaulted", "Recovered", "Closed"];
 
-  return (
-    <article className="market-card">
-      <header>
-        <div>
-          <h2>{facility.name}</h2>
-          <p>
-            Originator <AddressLink address={facility.originator} /> <span>•</span> tenor{" "}
-            {formatDuration(Number(facility.terms.tenor))}
-          </p>
-        </div>
-        <StatusBadge status={facility.statusName} />
-      </header>
-      <dl className="market-metrics">
-        <div>
-          <dt>Limit</dt>
-          <dd>{formatUsdc(facility.terms.limit)}</dd>
-        </div>
-        <div>
-          <dt>First-loss</dt>
-          <dd>{toPct(facility.terms.firstLoss, facility.terms.limit)}%</dd>
-        </div>
-        <div>
-          <dt>Financing fee</dt>
-          <dd>{bpsToPct(facility.terms.financingFeeBps)}%</dd>
-        </div>
-        <div>
-          <dt>Senior left</dt>
-          <dd>{formatUsdc(facility.seniorCapacity)}</dd>
-        </div>
-      </dl>
-      <div className="funding-row">
-        <span>
-          {formatUsdc(facility.totalCapital)} / {formatUsdc(facility.terms.capitalCap)} capital
-        </span>
-        <progress max="100" value={utilization}>{utilization}%</progress>
+/** Duration buckets, tested against the facility's real term. */
+const DURATIONS: Array<{ label: string; holds: (facility: Facility) => boolean }> = [
+  { label: "All", holds: () => true },
+  { label: "Up to 60 days", holds: (facility) => facility.durationDays <= 60 },
+  { label: "61 to 90 days", holds: (facility) => facility.durationDays > 60 && facility.durationDays <= 90 },
+  { label: "Over 90 days", holds: (facility) => facility.durationDays > 90 },
+];
+
+const usdM = (value: number) => `$${(value / 1_000_000).toFixed(2)}M`;
+
+export function Markets({ onReview }: { onReview: (market: Market) => void }) {
+  const { facilities } = useDemo();
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("All");
+  const [status, setStatus] = useState("All");
+  const [asset, setAsset] = useState("All");
+  const [duration, setDuration] = useState("All");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  // Every market is one of the originator's facilities, so the list and the
+  // summary are both derived rather than restated.
+  // Each row keeps its facility so filters test real numbers, not label text.
+  const rows = useMemo(() => facilities.map((facility) => ({ facility, market: facilityAsMarket(facility) })), [facilities]);
+  const summary = useMemo(() => ({
+    supplied: facilities.reduce((sum, f) => sum + f.supplied, 0),
+    outstanding: facilities.filter((f) => f.stage === "drawn").reduce((sum, f) => sum + owedOn(f), 0),
+    repaid: facilities.reduce((sum, f) => sum + f.repaid, 0),
+    active: facilities.filter((f) => f.stage !== "settled" && f.stage !== "closed").length,
+  }), [facilities]);
+  const statuses = useMemo(() => presentOptions(rows, STATUS_ORDER, (row) => row.market.status), [rows]);
+  const assets = useMemo(() => presentOptions(rows, [...new Set(rows.map((row) => row.market.asset))], (row) => row.market.asset), [rows]);
+  const held = DURATIONS.find((item) => item.label === duration) ?? DURATIONS[0];
+  const visible = useMemo(() => rows.filter(({ facility, market }) =>
+    `${market.name} ${market.company} ${market.route}`.toLowerCase().includes(query.trim().toLowerCase()) &&
+    (category === "All" || market.type === category) &&
+    (status === "All" || market.status === status) &&
+    (asset === "All" || market.asset === asset) &&
+    held.holds(facility)
+  ), [asset, category, held, query, rows, status]);
+
+  return <section className="markets-page">
+    <MarketsBackdrop />
+    <dl className="market-summary">
+      <div><dt>Capital supplied</dt><dd>{usdM(summary.supplied)}</dd></div><div><dt>Outstanding</dt><dd>{usdM(summary.outstanding)}</dd></div>
+      <div><dt>Repaid</dt><dd>{usdM(summary.repaid)}</dd></div><div><dt>Active facilities</dt><dd>{summary.active}</dd></div>
+    </dl>
+    <div className="markets-heading">
+      <div><h1>Markets</h1><p>Supply capital to isolated trade-finance facilities.</p></div>
+      <div className="heading-filters">
+        <div className="category-tabs" aria-label="Trade type">{categories.map((item) => <button key={item} className={category === item ? "active" : ""} onClick={() => setCategory(item)}><TabIcon variant={categoryIcon[item]} />{item}</button>)}</div>
+        <div className="view-toggle" aria-label="View"><button className={view === "grid" ? "active" : ""} aria-label="Grid view" onClick={() => setView("grid")}>▦</button><button className={view === "list" ? "active" : ""} aria-label="List view" onClick={() => setView("list")}>☷</button></div>
       </div>
-      <dl className="detail-list">
-        <div>
-          <dt>Grace</dt>
-          <dd>{formatDuration(Number(facility.terms.grace))}</dd>
-        </div>
-        <div>
-          <dt>Evidence</dt>
-          <dd>{/^0x0+$/.test(facility.evidenceHash) ? "not attached" : `${facility.evidenceHash.slice(0, 10)}…`}</dd>
-        </div>
-      </dl>
-      <button className="review-button" onClick={() => onReview(facility.address)}>
-        View market <span aria-hidden="true">→</span>
-      </button>
-    </article>
-  );
+    </div>
+    <FilterBar
+      query={query}
+      onQuery={setQuery}
+      placeholder="Search facility or originator…"
+      filters={[
+        { label: "Currency", value: asset, options: assets, onChange: setAsset },
+        { label: "Duration", value: duration, options: DURATIONS.map((item) => item.label), onChange: setDuration },
+        { label: "Status", value: status, options: statuses, onChange: setStatus },
+      ]}
+    />
+    <div className={`market-cards ${view}`}>{visible.map(({ market }) => <MarketCard key={market.name} market={market} onReview={onReview} />)}</div>
+    {visible.length === 0 && <p className="empty-state">No opportunities match these filters.</p>}
+    <p className="market-note"><span aria-hidden="true">ⓘ</span> Each market is isolated. Performance and losses do not transfer between facilities.</p>
+  </section>;
+}
+
+function MarketCard({ market, onReview }: { market: Market; onReview: (market: Market) => void }) {
+  return <article
+    className="market-card"
+    role="button"
+    tabIndex={0}
+    onClick={() => onReview(market)}
+    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onReview(market); } }}
+  >
+    <header><div><h2>{market.name}</h2><p>{market.type} <span>•</span> {market.route}</p></div><span className={`market-status ${market.status.toLowerCase()}`}><i />{market.status}</span></header>
+    <p className="market-company"><span aria-hidden="true">{market.icon}</span>{market.company}</p>
+    <dl className="market-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available</dt><dd>{market.available}</dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl>
+    <div className="funding-row"><span>{market.funded}% utilized</span><progress max="100" value={market.funded}>{market.funded}%</progress></div>
+    <button className="review-button" onClick={(e) => { e.stopPropagation(); onReview(market); }}>View market</button>
+  </article>;
 }
