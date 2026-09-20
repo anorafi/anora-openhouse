@@ -87,3 +87,9 @@ time on. The Originator form takes both in **minutes** and multiplies by 60
 before sending the transaction, so a demo facility can go from Open to
 markLate-eligible in a couple of minutes instead of days.
 
+
+## Contract quality
+
+- OpenZeppelin 5.7: `Clones` for facilities, `SafeERC20`, `ReentrancyGuard`, `Initializable`, `Ownable2Step`, `Pausable`.
+- 26 Foundry tests including a fuzz test that checks the waterfall never creates or loses capital (`testFuzz_waterfallConservesCapital`).
+- Slither (`uvx --from slither-analyzer slither . --filter-paths "lib/|test/|script/"`) reports no high or medium findings. Remaining informational items are intentional: late fees accrue per whole day (`divide-before-multiply`), and due dates, grace periods and late fees are timestamp based by design (`timestamp`).

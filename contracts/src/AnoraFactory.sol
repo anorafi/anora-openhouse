@@ -14,6 +14,7 @@ contract AnoraFactory is Ownable2Step, Pausable {
     using SafeERC20 for IERC20;
 
     error FirstLossTooSmall();
+    error ZeroAddress();
 
     uint256 public constant BPS = 10_000;
 
@@ -30,6 +31,7 @@ contract AnoraFactory is Ownable2Step, Pausable {
     event MinFirstLossChanged(uint256 previousBps, uint256 nextBps);
 
     constructor(address asset_, address riskAgent_, uint256 minFirstLossBps_) Ownable(msg.sender) {
+        if (asset_ == address(0) || riskAgent_ == address(0)) revert ZeroAddress();
         implementation = address(new AnoraFacility());
         asset = IERC20(asset_);
         riskAgent = riskAgent_;
@@ -52,13 +54,14 @@ contract AnoraFactory is Ownable2Step, Pausable {
     {
         if (terms.firstLoss < terms.limit * minFirstLossBps / BPS) revert FirstLossTooSmall();
         facility = Clones.clone(implementation);
-        asset.safeTransferFrom(msg.sender, facility, terms.firstLoss);
-        AnoraFacility(facility).initialize(address(asset), msg.sender, name, terms);
         facilities.push(facility);
         emit FacilityCreated(facility, msg.sender, name, terms.limit, terms.firstLoss);
+        asset.safeTransferFrom(msg.sender, facility, terms.firstLoss);
+        AnoraFacility(facility).initialize(address(asset), msg.sender, name, terms);
     }
 
     function setRiskAgent(address next) external onlyOwner {
+        if (next == address(0)) revert ZeroAddress();
         emit RiskAgentChanged(riskAgent, next);
         riskAgent = next;
     }

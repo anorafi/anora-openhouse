@@ -12,7 +12,7 @@ interface IRiskAgentSource {
 
 /// @title AnoraFacility
 /// @notice One isolated credit facility: its own Senior/Junior capital, first-loss stake, and default waterfall.
-contract AnoraFacility is Initializable, ReentrancyGuard {
+contract AnoraFacility is Initializable, ReentrancyGuard, IRiskAgentSource {
     using SafeERC20 for IERC20;
 
     enum Tranche {
@@ -52,6 +52,7 @@ contract AnoraFacility is Initializable, ReentrancyGuard {
     error GraceNotElapsed();
     error Overpayment();
     error NothingToRecover();
+    error ZeroAddress();
 
     uint256 public constant BPS = 10_000;
 
@@ -101,6 +102,7 @@ contract AnoraFacility is Initializable, ReentrancyGuard {
         external
         initializer
     {
+        if (asset_ == address(0) || originator_ == address(0)) revert ZeroAddress();
         factory = msg.sender;
         asset = IERC20(asset_);
         originator = originator_;
@@ -109,7 +111,7 @@ contract AnoraFacility is Initializable, ReentrancyGuard {
         firstLossReserve = terms_.firstLoss;
     }
 
-    function riskAgent() public view returns (address) {
+    function riskAgent() public view override returns (address) {
         return IRiskAgentSource(factory).riskAgent();
     }
 
