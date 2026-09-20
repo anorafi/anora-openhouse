@@ -125,7 +125,7 @@ Chrome window with an injected wallet; see its header for the env vars
 
 ## apps/keeper
 
-Permissionless watcher. Every minute it reads every facility from the factories in `contracts/deployments.json` (Robinhood Chain and Arbitrum Sepolia), and calls `markLate()` on any Open facility whose principal is past its due date. Anyone can call `markLate`, so the keeper holds no privilege; it only makes sure nobody has to. Runs on the VPS as the `anora-keeper` systemd user unit; `bun run test:keeper` covers the selection rule.
+Permissionless watcher. It subscribes to `Drawn` events over Alchemy websockets on Robinhood Chain and Arbitrum Sepolia and schedules a `markLate()` call for the exact due timestamp; a one-minute poll over every facility in `contracts/deployments.json` is the fallback. Late status itself is derived onchain from timestamps; the keeper only makes sure somebody calls the permissionless function. Anyone can call `markLate`, so the keeper holds no privilege; it only makes sure nobody has to. Runs on the VPS as the `anora-keeper` systemd user unit; `bun run test:keeper` covers the selection rule.
 
 ```
 KEEPER_PRIVATE_KEY=0x... bun run keeper
