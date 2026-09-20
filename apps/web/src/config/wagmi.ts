@@ -15,12 +15,15 @@ export const robinhood = defineChain({
   },
 });
 
+const alchemyKey = import.meta.env.VITE_ALCHEMY_API_KEY as string | undefined;
+const rpc = (alchemyHost: string, fallback: string) => (alchemyKey ? `https://${alchemyHost}.g.alchemy.com/v2/${alchemyKey}` : fallback);
+
 export const wagmiConfig = createConfig({
   chains: [arbitrumSepolia, robinhood],
   connectors: [injected()],
   transports: {
-    [arbitrumSepolia.id]: http("https://sepolia-rollup.arbitrum.io/rpc"),
-    [robinhood.id]: http("https://rpc.mainnet.chain.robinhood.com"),
+    [arbitrumSepolia.id]: http(rpc("arb-sepolia", "https://sepolia-rollup.arbitrum.io/rpc")),
+    [robinhood.id]: http(rpc("robinhood-mainnet", "https://rpc.mainnet.chain.robinhood.com")),
   },
 });
 
