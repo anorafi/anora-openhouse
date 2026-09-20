@@ -142,9 +142,15 @@ async function setLabeledInput(labelText, value) {
 }
 
 async function setSelect(index, value) {
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    if (await page.evaluate((i) => document.querySelectorAll("select").length > i, index)) break;
+    await sleep(500);
+  }
   await page.evaluate(
     ({ index, value }) => {
       const el = document.querySelectorAll("select")[index];
+      if (!el) throw new Error(`no select at index ${index}`);
       Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(el, value);
       el.dispatchEvent(new Event("change", { bubbles: true }));
     },
@@ -283,8 +289,9 @@ await waitForText(account.address.slice(0, 6));
 await shot("connected");
 
 const resuming = !!process.env.SMOKE_RESUME;
+const from = process.env.SMOKE_FROM ?? (resuming ? "default" : "start");
 
-if (!resuming) {
+if (from === "start") {
   await clickButton("Originate");
   await waitForText("New facility");
 
@@ -313,6 +320,7 @@ if (!resuming) {
 
   await scopedClick(facilityName, "View →");
   await waitForText(facilityName);
+  const facilityHash = await page.evaluate(() => location.hash);
   await checkAllBoxes();
 
   await setSelect(0, "Junior");
@@ -322,15 +330,20 @@ if (!resuming) {
     await waitForButton("Deposit");
   }
   await clickButton("Deposit");
-  await waitForText(fmt(10));
+  await waitForText("Capital supplied successfully.");
   await shot("junior-deposited");
 
+  await page.evaluate((h) => { location.hash = h; }, facilityHash);
+  await waitForText(facilityName);
+  await checkAllBoxes();
   await setSelect(0, "Senior");
   await setInput('input[placeholder^="Amount"]', amount(20));
   await clickButton("Deposit");
-  await waitForText(fmt(20));
+  await waitForText("Capital supplied successfully.");
   await shot("senior-deposited");
+}
 
+if (from === "start" || from === "drawdown") {
   await clickButton("Originate");
   await waitForCard(facilityName);
   await scopedSetInput(facilityName, 'input[placeholder="Drawdown amount"]', amount(15));
