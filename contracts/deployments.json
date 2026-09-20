@@ -20,10 +20,11 @@
     "asset": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
     "assetSymbol": "USDG",
     "faucet": false,
-    "AnoraFactory": "0x9300dbB89FC8a64dcD61511c9d17f5B5eF3E039b",
-    "AnoraFacilityImplementation": "0x997Ba1d35832B8C97C3F01125A6C9dDE0Df6f58d",
+    "AnoraFactory": "0x9a01C5E22602E565d39067454dD70c38D063D328",
+    "AnoraFacilityImplementation": "0x8695a1C6AD462DFc7a6cb7980dB99D9Eb1c26F6f",
     "initialRiskAgent": "0x07dF8cd6D20b71ba7F16309d2844B88d1043fFfB",
     "minFirstLossBps": 1000,
-    "note": "commit ddeb269, predates zero-address checks; redeploy pending ETH top-up"
+    "note": "commit 055a7cd with zero-address checks",
+    "previousFactory": "0x9300dbB89FC8a64dcD61511c9d17f5B5eF3E039b"
   }
 }

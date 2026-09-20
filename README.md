@@ -13,8 +13,8 @@ Arbitrum Sepolia.
 
 | Contract | Robinhood Chain (mainnet, USDG) |
 |---|---|
-| AnoraFactory | [`0x9300dbB89FC8a64dcD61511c9d17f5B5eF3E039b`](https://robinhoodchain.blockscout.com/address/0x9300dbB89FC8a64dcD61511c9d17f5B5eF3E039b) |
-| AnoraFacility (implementation) | [`0x997Ba1d35832B8C97C3F01125A6C9dDE0Df6f58d`](https://robinhoodchain.blockscout.com/address/0x997Ba1d35832B8C97C3F01125A6C9dDE0Df6f58d) |
+| AnoraFactory | [`0x9a01C5E22602E565d39067454dD70c38D063D328`](https://robinhoodchain.blockscout.com/address/0x9a01C5E22602E565d39067454dD70c38D063D328) |
+| AnoraFacility (implementation) | [`0x8695a1C6AD462DFc7a6cb7980dB99D9Eb1c26F6f`](https://robinhoodchain.blockscout.com/address/0x8695a1C6AD462DFc7a6cb7980dB99D9Eb1c26F6f) |
 | USDG | [`0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168`](https://robinhoodchain.blockscout.com/address/0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168) |
 
 | Contract | Arbitrum Sepolia |
