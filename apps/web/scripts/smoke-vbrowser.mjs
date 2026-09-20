@@ -216,6 +216,22 @@ async function scopedWaitForButton(cardText, buttonText, { timeout = 120_000 } =
   throw new Error(`button never enabled in card "${cardText}": ${buttonText}`);
 }
 
+async function scopedWaitUntilGone(cardText, text, { timeout = 120_000 } = {}) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const stillThere = await page.evaluate(
+      ({ cardText, text }) => {
+        const card = [...document.querySelectorAll(".card, .market-card")].find((c) => c.innerText.includes(cardText));
+        return !!card && card.innerText.includes(text);
+      },
+      { cardText, text },
+    );
+    if (!stillThere) return;
+    await sleep(1_000);
+  }
+  throw new Error(`text never left card "${cardText}": ${text}`);
+}
+
 async function scopedWaitForText(cardText, text, { timeout = 120_000 } = {}) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
@@ -319,6 +335,7 @@ if (!resuming) {
   await waitForCard(facilityName);
   await scopedSetInput(facilityName, 'input[placeholder="Drawdown amount"]', amount(15));
   await scopedClick(facilityName, "Drawdown");
+  await scopedWaitUntilGone(facilityName, "Owed (live): 0 ");
   await shot("drawn");
 
   await clickButton("Risk");
