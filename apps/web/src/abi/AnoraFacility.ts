@@ -1,55 +1,7 @@
-export const AnoraPoolAbi = [
+export const AnoraFacilityAbi = [
   {
     "type": "constructor",
-    "inputs": [
-      {
-        "name": "asset_",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "riskAgent_",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "policy_",
-        "type": "tuple",
-        "internalType": "struct AnoraPool.Policy",
-        "components": [
-          {
-            "name": "seniorPerJuniorBps",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "minFirstLossBps",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "financingFeeBps",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "lateFeePerDayBps",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "seniorFeeShareBps",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "depositCap",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      }
-    ],
+    "inputs": [],
     "stateMutability": "nonpayable"
   },
   {
@@ -80,13 +32,21 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "function",
-    "name": "declareDefault",
+    "name": "attachEvidence",
     "inputs": [
       {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
+        "name": "hash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "declareDefault",
+    "inputs": [
       {
         "name": "reason",
         "type": "string",
@@ -98,14 +58,8 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "function",
-    "name": "defaultReasonOf",
-    "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
+    "name": "defaultReason",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -117,14 +71,8 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "function",
-    "name": "defaultedAtOf",
-    "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
+    "name": "defaultedAt",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -141,7 +89,7 @@ export const AnoraPoolAbi = [
       {
         "name": "tranche",
         "type": "uint8",
-        "internalType": "enum AnoraPool.Tranche"
+        "internalType": "enum AnoraFacility.Tranche"
       },
       {
         "name": "amount",
@@ -163,11 +111,6 @@ export const AnoraPoolAbi = [
     "name": "drawdown",
     "inputs": [
       {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
@@ -178,14 +121,8 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "function",
-    "name": "dueAtOf",
-    "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
+    "name": "dueAt",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -197,54 +134,39 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "function",
-    "name": "facilities",
-    "inputs": [
+    "name": "evidenceHash",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "factory",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "address",
         "internalType": "address"
-      },
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "fee",
+    "inputs": [],
+    "outputs": [
       {
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "enum AnoraPool.Status"
       }
     ],
     "stateMutability": "view"
@@ -261,6 +183,81 @@ export const AnoraPoolAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "initialize",
+    "inputs": [
+      {
+        "name": "asset_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "originator_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "name_",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "terms_",
+        "type": "tuple",
+        "internalType": "struct AnoraFacility.Terms",
+        "components": [
+          {
+            "name": "limit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "firstLoss",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "tenor",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "grace",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "financingFeeBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "lateFeePerDayBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "seniorPerJuniorBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "seniorFeeShareBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "capitalCap",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -309,14 +306,21 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "function",
-    "name": "lateSinceOf",
-    "inputs": [
+    "name": "lateAccruedAt",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "id",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lateSince",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -341,14 +345,47 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "function",
-    "name": "lossesOf",
-    "inputs": [
+    "name": "lossFirstLoss",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "id",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lossJunior",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lossSenior",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "losses",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -371,19 +408,39 @@ export const AnoraPoolAbi = [
   {
     "type": "function",
     "name": "markLate",
-    "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "nextFacilityId",
+    "name": "name",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "originator",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "owed",
     "inputs": [],
     "outputs": [
       {
@@ -396,105 +453,8 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "function",
-    "name": "openFacility",
-    "inputs": [
-      {
-        "name": "limit",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "firstLoss",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "tenor",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "grace",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "owedOf",
-    "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "policy",
+    "name": "principal",
     "inputs": [],
-    "outputs": [
-      {
-        "name": "seniorPerJuniorBps",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "minFirstLossBps",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "financingFeeBps",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "lateFeePerDayBps",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "seniorFeeShareBps",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "depositCap",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "principalOf",
-    "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
     "outputs": [
       {
         "name": "",
@@ -509,11 +469,6 @@ export const AnoraPoolAbi = [
     "name": "recordRecovery",
     "inputs": [
       {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
@@ -526,11 +481,6 @@ export const AnoraPoolAbi = [
     "type": "function",
     "name": "repay",
     "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
       {
         "name": "amount",
         "type": "uint256",
@@ -613,32 +563,66 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "function",
-    "name": "setRiskAgent",
-    "inputs": [
-      {
-        "name": "next",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "statusOf",
-    "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
+    "name": "status",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "uint8",
-        "internalType": "enum AnoraPool.Status"
+        "internalType": "enum AnoraFacility.Status"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "terms",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "firstLoss",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "tenor",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "grace",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "financingFeeBps",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "lateFeePerDayBps",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "seniorPerJuniorBps",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "seniorFeeShareBps",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "capitalCap",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -663,7 +647,7 @@ export const AnoraPoolAbi = [
       {
         "name": "tranche",
         "type": "uint8",
-        "internalType": "enum AnoraPool.Tranche"
+        "internalType": "enum AnoraFacility.Tranche"
       },
       {
         "name": "shares",
@@ -684,12 +668,6 @@ export const AnoraPoolAbi = [
     "type": "event",
     "name": "DefaultDeclared",
     "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
       {
         "name": "reason",
         "type": "string",
@@ -731,7 +709,7 @@ export const AnoraPoolAbi = [
         "name": "tranche",
         "type": "uint8",
         "indexed": false,
-        "internalType": "enum AnoraPool.Tranche"
+        "internalType": "enum AnoraFacility.Tranche"
       },
       {
         "name": "assets",
@@ -752,12 +730,6 @@ export const AnoraPoolAbi = [
     "type": "event",
     "name": "Drawn",
     "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
       {
         "name": "amount",
         "type": "uint256",
@@ -781,44 +753,38 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "event",
-    "name": "FacilityClosed",
+    "name": "EvidenceAttached",
     "inputs": [
       {
-        "name": "id",
-        "type": "uint256",
+        "name": "hash",
+        "type": "bytes32",
         "indexed": true,
-        "internalType": "uint256"
+        "internalType": "bytes32"
+      },
+      {
+        "name": "by",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false
   },
   {
     "type": "event",
-    "name": "FacilityOpened",
+    "name": "FacilityClosed",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Initialized",
     "inputs": [
       {
-        "name": "id",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "originator",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "limit",
-        "type": "uint256",
+        "name": "version",
+        "type": "uint64",
         "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "firstLoss",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        "internalType": "uint64"
       }
     ],
     "anonymous": false
@@ -827,12 +793,6 @@ export const AnoraPoolAbi = [
     "type": "event",
     "name": "MarkedLate",
     "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
       {
         "name": "dueAt",
         "type": "uint256",
@@ -852,12 +812,6 @@ export const AnoraPoolAbi = [
     "type": "event",
     "name": "Recovered",
     "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
       {
         "name": "amount",
         "type": "uint256",
@@ -890,12 +844,6 @@ export const AnoraPoolAbi = [
     "name": "Repaid",
     "inputs": [
       {
-        "name": "id",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
         "name": "principal",
         "type": "uint256",
         "indexed": false,
@@ -906,25 +854,6 @@ export const AnoraPoolAbi = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "RiskAgentChanged",
-    "inputs": [
-      {
-        "name": "previous",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "next",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -943,7 +872,7 @@ export const AnoraPoolAbi = [
         "name": "tranche",
         "type": "uint8",
         "indexed": false,
-        "internalType": "enum AnoraPool.Tranche"
+        "internalType": "enum AnoraFacility.Tranche"
       },
       {
         "name": "assets",
@@ -962,7 +891,7 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "error",
-    "name": "DepositCapExceeded",
+    "name": "CapitalCapExceeded",
     "inputs": []
   },
   {
@@ -973,11 +902,6 @@ export const AnoraPoolAbi = [
   {
     "type": "error",
     "name": "FacilityNotOpen",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "FirstLossTooSmall",
     "inputs": []
   },
   {
@@ -997,7 +921,17 @@ export const AnoraPoolAbi = [
   },
   {
     "type": "error",
+    "name": "InvalidInitialization",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "LimitExceeded",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotInitializing",
     "inputs": []
   },
   {
@@ -1024,6 +958,22 @@ export const AnoraPoolAbi = [
     "type": "error",
     "name": "Overpayment",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SafeERC20FailedOperation",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",

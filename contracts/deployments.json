@@ -2,24 +2,26 @@
   "arbitrumSepolia": {
     "chainId": 421614,
     "deployedAt": "2026-09-20",
-    "asset": "0x382b7722f814d3DCF958B1938a63C4e15B6Db2D6",
+    "asset": "0xafEA33B071474eCdE4cBDC3aDBd80D18655A3A4a",
     "assetSymbol": "TestUSDC",
     "faucet": true,
-    "AnoraPool": "0x45FD61Fe12E13C5f722F10178aED4067224f2e20",
+    "AnoraFactory": "0x04f037908F2BdFdD75363E5eBc5F46f6b5834d22",
+    "AnoraFacilityImplementation": "0x77BE4BF603d295AD3A2A7C9Eb29F38b3049EFf89",
     "initialRiskAgent": "0x07dF8cd6D20b71ba7F16309d2844B88d1043fFfB",
-    "depositCap": "10000000000000",
+    "minFirstLossBps": 1000,
     "explorer": "https://sepolia.arbiscan.io"
   },
   "robinhood": {
     "chainId": 4663,
+    "deployedAt": "2026-09-20",
     "rpc": "https://rpc.mainnet.chain.robinhood.com",
     "explorer": "https://robinhoodchain.blockscout.com",
     "asset": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
     "assetSymbol": "USDG",
     "faucet": false,
-    "AnoraPool": "0xe092c9607d81D38FB392208D9bc9b6075e0199d2",
-    "deployedAt": "2026-09-20",
+    "AnoraFactory": "0x9300dbB89FC8a64dcD61511c9d17f5B5eF3E039b",
+    "AnoraFacilityImplementation": "0x997Ba1d35832B8C97C3F01125A6C9dDE0Df6f58d",
     "initialRiskAgent": "0x07dF8cd6D20b71ba7F16309d2844B88d1043fFfB",
-    "depositCap": "1000000000"
+    "minFirstLossBps": 1000
   }
 }

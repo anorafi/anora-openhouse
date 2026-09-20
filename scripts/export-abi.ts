@@ -5,7 +5,8 @@ const root = join(import.meta.dir, "..");
 const outDir = join(root, "apps/web/src/abi");
 
 const targets = [
-  { artifact: "contracts/out/AnoraPool.sol/AnoraPool.json", name: "AnoraPool" },
+  { artifact: "contracts/out/AnoraFactory.sol/AnoraFactory.json", name: "AnoraFactory" },
+  { artifact: "contracts/out/AnoraFacility.sol/AnoraFacility.json", name: "AnoraFacility" },
   { artifact: "contracts/out/TestUSDC.sol/TestUSDC.json", name: "TestUSDC" },
 ];
 

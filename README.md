@@ -1,9 +1,10 @@
 # Anora Open House
 
-Onchain credit pool for curated originators. Capital providers deposit into a
-single pool split into Senior and Junior tranches; originators open facilities,
-stake first-loss capital in Junior, draw liquidity, and repay with a financing
-fee. Late payments pause drawdown automatically. Default is declared by a risk
+Isolated onchain credit facilities for curated originators. Each facility is
+its own vault (a minimal clone opened through `AnoraFactory`) with Senior and
+Junior tranches; the originator stakes first-loss capital, draws liquidity,
+and repays with a financing fee. A default in one facility never touches
+another. Late payments pause drawdown automatically. Default is declared by a risk
 agent with the reason recorded onchain, first-loss capital absorbs the loss
 first, and recoveries flow back through the waterfall, Senior first.
 
@@ -12,13 +13,15 @@ Arbitrum Sepolia.
 
 | Contract | Robinhood Chain (mainnet, USDG) |
 |---|---|
-| AnoraPool | [`0xe092c9607d81D38FB392208D9bc9b6075e0199d2`](https://robinhoodchain.blockscout.com/address/0xe092c9607d81D38FB392208D9bc9b6075e0199d2) |
+| AnoraFactory | [`0x9300dbB89FC8a64dcD61511c9d17f5B5eF3E039b`](https://robinhoodchain.blockscout.com/address/0x9300dbB89FC8a64dcD61511c9d17f5B5eF3E039b) |
+| AnoraFacility (implementation) | [`0x997Ba1d35832B8C97C3F01125A6C9dDE0Df6f58d`](https://robinhoodchain.blockscout.com/address/0x997Ba1d35832B8C97C3F01125A6C9dDE0Df6f58d) |
 | USDG | [`0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168`](https://robinhoodchain.blockscout.com/address/0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168) |
 
 | Contract | Arbitrum Sepolia |
 |---|---|
-| AnoraPool | [`0x45FD61Fe12E13C5f722F10178aED4067224f2e20`](https://sepolia.arbiscan.io/address/0x45FD61Fe12E13C5f722F10178aED4067224f2e20) |
-| TestUSDC | [`0x382b7722f814d3DCF958B1938a63C4e15B6Db2D6`](https://sepolia.arbiscan.io/address/0x382b7722f814d3DCF958B1938a63C4e15B6Db2D6) |
+| AnoraFactory | [`0x04f037908F2BdFdD75363E5eBc5F46f6b5834d22`](https://sepolia.arbiscan.io/address/0x04f037908F2BdFdD75363E5eBc5F46f6b5834d22) |
+| AnoraFacility (implementation) | [`0x77BE4BF603d295AD3A2A7C9Eb29F38b3049EFf89`](https://sepolia.arbiscan.io/address/0x77BE4BF603d295AD3A2A7C9Eb29F38b3049EFf89) |
+| TestUSDC | [`0xafEA33B071474eCdE4cBDC3aDBd80D18655A3A4a`](https://sepolia.arbiscan.io/address/0xafEA33B071474eCdE4cBDC3aDBd80D18655A3A4a) |
 
 Monorepo, Bun workspaces.
 
