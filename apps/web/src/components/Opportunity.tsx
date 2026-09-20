@@ -49,7 +49,6 @@ export function Opportunity({
 
   useEffect(() => {
     if (deposit.isConfirmed) onComplete();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deposit.isConfirmed]);
 
   if (!facilityAddress) {
