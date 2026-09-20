@@ -13,7 +13,7 @@ describe("parseHash", () => {
     expect(parseHash("#portfolio")).toEqual({ page: "portfolio" });
     expect(parseHash("#activity")).toEqual({ page: "activity" });
     expect(parseHash("#originate")).toEqual({ page: "originate" });
-    expect(parseHash("#risk")).toEqual({ page: "risk" });
+    expect(parseHash("#ops")).toEqual({ page: "ops" });
   });
 
   it("parses an opportunity route with a valid facility address", () => {
@@ -35,7 +35,7 @@ describe("parseHash", () => {
 
 describe("routeToHash", () => {
   it("round-trips plain pages", () => {
-    expect(routeToHash({ page: "risk" })).toBe("risk");
+    expect(routeToHash({ page: "ops" })).toBe("ops");
   });
 
   it("round-trips an opportunity route with a facility", () => {

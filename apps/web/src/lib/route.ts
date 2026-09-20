@@ -1,11 +1,11 @@
 import type { Address } from "viem";
 
-export type Page = "markets" | "opportunity" | "portfolio" | "activity" | "originate" | "risk";
+export type Page = "markets" | "opportunity" | "portfolio" | "activity" | "originate" | "ops";
 
 export type Route = { page: "opportunity"; facility: Address | null } | { page: Exclude<Page, "opportunity"> };
 
 const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
-const PLAIN_PAGES: Exclude<Page, "opportunity">[] = ["markets", "portfolio", "activity", "originate", "risk"];
+const PLAIN_PAGES: Exclude<Page, "opportunity">[] = ["markets", "portfolio", "activity", "originate", "ops"];
 
 export function parseHash(hash: string): Route {
   const clean = hash.replace(/^#/, "");

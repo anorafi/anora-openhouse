@@ -351,7 +351,7 @@ if (from === "start" || from === "drawdown") {
   await scopedWaitUntilGone(facilityName, "Owed (live): 0 ");
   await shot("drawn");
 
-  await clickButton("Risk");
+  await page.evaluate(() => { location.hash = "ops"; });
   await waitForCard(facilityName);
   await scopedWaitForButton(facilityName, "Mark late", { timeout: (tenorMinutes + 2) * 60_000 });
   await shot("past-due");
@@ -360,7 +360,7 @@ if (from === "start" || from === "drawdown") {
   await scopedWaitForText(facilityName, "Late");
   await shot("marked-late");
 } else {
-  await clickButton("Risk");
+  await page.evaluate(() => { location.hash = "ops"; });
   await waitForCard(facilityName);
 }
 

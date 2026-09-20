@@ -56,7 +56,7 @@ export function App() {
             )}
             {route.page === "activity" && <Activity />}
             {route.page === "originate" && <Originate onView={(facility) => navigate({ page: "opportunity", facility })} />}
-            {route.page === "risk" && <Risk />}
+            {route.page === "ops" && <Risk />}
           </>
         )}
       </main>

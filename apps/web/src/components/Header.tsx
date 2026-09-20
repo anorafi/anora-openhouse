@@ -16,8 +16,7 @@ const NAV_ITEMS: { page: Page; label: string }[] = [
   { page: "markets", label: "Markets" },
   { page: "portfolio", label: "Portfolio" },
   { page: "activity", label: "Activity" },
-  { page: "originate", label: "Originate" },
-  { page: "risk", label: "Risk" },
+  { page: "originate", label: "Originator" },
 ];
 
 export function Header({ page, onNavigate }: { page: Page; onNavigate: (page: Page) => void }) {
