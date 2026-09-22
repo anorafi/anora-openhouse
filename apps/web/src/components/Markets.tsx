@@ -125,15 +125,30 @@ export function Markets({ onReview }: { onReview: (market: Market) => void }) {
         { label: "Status", value: status, options: statuses, onChange: setStatus },
       ]}
     />
-    <div className={`market-cards ${view}`}>{visible.map(({ market }) => <MarketCard key={market.name} market={market} onReview={onReview} />)}</div>
+    {view === "grid"
+      ? <div className="market-cards">{visible.map(({ market }) => <MarketCard key={market.name} market={market} onReview={onReview} />)}</div>
+      : <div className="market-list">
+          <div className="market-list-head" aria-hidden="true"><span>Opportunity</span><span>Type</span><span>Route</span><span>Company</span><span>Target return</span><span>Available</span><span>Utilized</span><span>Duration</span><span /></div>
+          {visible.map(({ market }) => <MarketListRow key={market.name} market={market} onReview={onReview} />)}
+        </div>}
     {visible.length === 0 && <p className="empty-state">No opportunities match these filters.</p>}
     <p className="market-note"><span aria-hidden="true">ⓘ</span> Each market is isolated. Performance and losses do not transfer between facilities.</p>
   </section>;
 }
 
+function MarketListRow({ market, onReview }: { market: Market; onReview: (market: Market) => void }) {
+  return <article className={`market-list-row status-${market.status.toLowerCase()}`}>
+    <div className="list-name"><strong>{market.name}</strong><span className={`market-status ${market.status.toLowerCase()}`}><i />{market.status}</span></div>
+    <span>{market.type}</span><span>{market.route}</span><span>{market.company}</span><strong>{market.targetReturn}</strong><strong>{market.available}</strong>
+    <div className="list-utilization"><span>{market.funded}%</span><progress max="100" value={market.funded}>{market.funded}%</progress></div>
+    <strong>{market.duration}</strong>
+    <button className="list-action" onClick={() => onReview(market)}>View market <span aria-hidden="true">→</span></button>
+  </article>;
+}
+
 function MarketCard({ market, onReview }: { market: Market; onReview: (market: Market) => void }) {
   return <article
-    className="market-card"
+    className={`market-card status-${market.status.toLowerCase()}`}
     role="button"
     tabIndex={0}
     onClick={() => onReview(market)}

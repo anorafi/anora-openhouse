@@ -28,7 +28,7 @@ export const STAGE_LABEL: Record<Stage, string> = {
 export const ORIGINATOR_ACTION: Record<Stage, string | null> = {
   open: null,
   funded: "Draw liquidity",
-  drawn: "Repay principal and fees",
+  drawn: "Repay",
   repaid: null,
   settled: null,
   defaulted: "Remit recoveries",

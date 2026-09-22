@@ -61,6 +61,7 @@ export function OriginatorFacilities({ onManage, onOpen }: { onManage: (id: stri
   const [type, setType] = useState("All");
   const [duration, setDuration] = useState("All");
   const [status, setStatus] = useState("All");
+  const [view, setView] = useState<"grid" | "list">("grid");
 
   // Options come from the book itself, so a filter can never offer a value
   // that matches nothing.
@@ -92,7 +93,10 @@ export function OriginatorFacilities({ onManage, onOpen }: { onManage: (id: stri
 
     <div className="markets-heading">
       <div><h2>Facilities</h2><p>Open, draw, and repay from here.</p></div>
-      <button className="accent-button" onClick={onOpen}>Open a facility</button>
+      <div className="originator-heading-actions">
+        <div className="view-toggle" aria-label="View"><button className={view === "grid" ? "active" : ""} aria-label="Grid view" onClick={() => setView("grid")}>▦</button><button className={view === "list" ? "active" : ""} aria-label="List view" onClick={() => setView("list")}>☷</button></div>
+        <button className="accent-button" onClick={onOpen}>Open a facility</button>
+      </div>
     </div>
 
     <FilterBar
@@ -110,8 +114,23 @@ export function OriginatorFacilities({ onManage, onOpen }: { onManage: (id: stri
       ? <p className="empty-state">No facilities yet. Open one to list it for capital providers.</p>
       : visible.length === 0
         ? <p className="empty-state">No facilities match these filters.</p>
-        : <div className="facility-grid">{visible.map((facility) => <FacilityCard key={facility.id} facility={facility} onManage={() => onManage(facility.id)} />)}</div>}
+        : view === "grid"
+          ? <div className="facility-grid">{visible.map((facility) => <FacilityCard key={facility.id} facility={facility} onManage={() => onManage(facility.id)} />)}</div>
+          : <div className="market-list facility-list">
+              <div className="facility-list-head" aria-hidden="true"><span>Facility</span><span>Type</span><span>Route</span><span>Company</span><span>Credit limit</span><span>Supplied</span><span>Drawn / owed</span><span>Reserve</span><span /></div>
+              {visible.map((facility) => <FacilityListRow key={facility.id} facility={facility} onManage={() => onManage(facility.id)} />)}
+            </div>}
   </section>;
+}
+
+function FacilityListRow({ facility, onManage }: { facility: Facility; onManage: () => void }) {
+  const action = ORIGINATOR_ACTION[facility.stage];
+  const amount = (value: number) => Math.round(value).toLocaleString();
+  return <article className={`facility-list-row status-${facility.stage}`}>
+    <div className="list-name"><strong>{facility.name}</strong><span className={`market-status ${facility.stage}`}><i />{STAGE_LABEL[facility.stage]}</span></div>
+    <span>{facility.type}</span><span>{facility.route}</span><span>{facility.company}</span><strong>{amount(facility.limit)}</strong><strong>{amount(facility.supplied)}</strong><strong>{amount(lastValue(facility))}</strong><strong>{amount(facility.firstLoss)}</strong>
+    <button className={action ? "list-action primary" : "list-action"} onClick={onManage}>{action ?? "Manage"}</button>
+  </article>;
 }
 
 /** The fourth figure tracks whatever matters most at this stage. */
@@ -127,7 +146,7 @@ function lastValue(facility: Facility) {
 function FacilityCard({ facility, onManage }: { facility: Facility; onManage: () => void }) {
   const action = ORIGINATOR_ACTION[facility.stage];
   return <article
-    className="facility-row"
+    className={`facility-row status-${facility.stage}`}
     role="button"
     tabIndex={0}
     onClick={onManage}
@@ -147,7 +166,6 @@ function FacilityCard({ facility, onManage }: { facility: Facility; onManage: ()
       <div><dt>{lastLabel(facility)}</dt><dd>{usd(lastValue(facility))}</dd></div>
     </dl>
     <footer>
-      <span className="facility-hint">{hintFor(facility.stage)}</span>
       <button className={action ? "accent-button" : "secondary-button"} onClick={(event) => { event.stopPropagation(); onManage(); }}>{action ?? "Manage"}</button>
     </footer>
   </article>;
