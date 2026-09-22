@@ -14,10 +14,9 @@ const LIFECYCLE: Array<{ stage: Stage; label: string; by: string }> = [
   { stage: "funded", label: "Capital supplied", by: "Capital provider" },
   { stage: "drawn", label: "Liquidity drawn", by: "Originator" },
   { stage: "repaid", label: "Principal and fees repaid", by: "Originator" },
-  { stage: "settled", label: "Claimed", by: "Capital provider" },
 ];
 
-const ORDER: Stage[] = ["open", "funded", "drawn", "repaid", "settled"];
+const ORDER: Stage[] = ["open", "funded", "drawn", "repaid"];
 
 /** The exceptional path. No role acts it out; the protocol records it. */
 const DEFAULT_LIFECYCLE: Array<{ label: string; by: string }> = [
@@ -27,18 +26,17 @@ const DEFAULT_LIFECYCLE: Array<{ label: string; by: string }> = [
   { label: "Marked late, drawdowns stopped", by: "Keeper, permissionless" },
   { label: "Default declared after grace", by: "Risk agent" },
   { label: "Recoveries remitted in full", by: "Originator" },
-  { label: "Principal and return claimed", by: "Capital provider" },
 ];
 /** How far along the default path each stage sits. */
-const DEFAULT_INDEX: Record<string, number> = { defaulted: 5, recovered: 6, closed: 7 };
+const DEFAULT_INDEX: Record<string, number> = { defaulted: 5, recovered: 6, closed: 6 };
 
 function hintFor(stage: Stage) {
   switch (stage) {
     case "open": return "Listed in Markets. Waiting on capital providers to supply.";
     case "funded": return "Capital is in. Draw liquidity against the facility.";
     case "drawn": return "Repay principal plus the financing fee to close the facility.";
-    case "repaid": return "Repaid. The capital provider can now claim principal and return.";
-    case "settled": return "Settled. Principal and return have been claimed.";
+    case "repaid": return "Repayment complete. This facility is finished on your side.";
+    case "settled": return "Complete. Thanks for using Anora.";
     case "defaulted": return "Default declared. Remit recoveries as they come in until the balance is cleared.";
     case "recovered": return "Balance cleared. The capital provider can now claim.";
     case "closed": return "Closed. Principal and return have been claimed.";
@@ -135,11 +133,13 @@ function FacilityCard({ facility, onManage }: { facility: Facility; onManage: ()
     onClick={onManage}
     onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onManage(); } }}
   >
-    <header>
-      <div><h3>{facility.name}</h3><p>{facility.type} <span>•</span> {facility.route}</p></div>
-      <span className={`market-status ${facility.stage}`}><i />{STAGE_LABEL[facility.stage]}</span>
-    </header>
-    <p className="market-company"><span aria-hidden="true">{facility.icon}</span>{facility.company}</p>
+    <div className="card-intro">
+      <header>
+        <div><h3>{facility.name}</h3><p><span>{facility.type}</span><span>{facility.route}</span></p></div>
+        <span className={`market-status ${facility.stage}`}><i />{STAGE_LABEL[facility.stage]}</span>
+      </header>
+      <p className="market-company"><span aria-hidden="true">{facility.icon}</span>{facility.company}</p>
+    </div>
     <dl className="facility-figures">
       <div><dt>Credit limit</dt><dd>{usd(facility.limit)}</dd></div>
       <div><dt>First-loss</dt><dd>{usd(facility.firstLoss)}</dd></div>
@@ -169,7 +169,7 @@ export function FacilityDetail({ facility, onBack }: { facility: Facility; onBac
   const flow = waterfallOf(facility.stage === "defaulted" ? { ...facility, recovered: facility.recovered + payment } : facility);
   const drawable = Math.min(facility.supplied, facility.limit);
   const owed = owedOn(facility);
-  const currentIndex = ORDER.indexOf(facility.stage);
+  const currentIndex = facility.stage === "settled" ? ORDER.length : ORDER.indexOf(facility.stage);
 
   return <section className="opportunity-page">
     <button className="back-link" onClick={onBack}><span aria-hidden="true">←</span> Back to My facilities</button>
@@ -180,10 +180,17 @@ export function FacilityDetail({ facility, onBack }: { facility: Facility; onBac
 
     <div className="opportunity-layout">
       <aside className="supply-panel">
-        {!action && !onDefaultPath && <>
-          <h2>{facility.stage === "open" ? "Waiting on capital" : facility.stage === "repaid" ? "Waiting on claim" : "Facility settled"}</h2>
-          <p className="panel-copy">{hintFor(facility.stage)}</p>
-        </>}
+        {!action && !onDefaultPath && (facility.stage === "repaid" || facility.stage === "settled"
+          ? <div className="flow-done" role="status">
+            <span className="flow-done-mark" aria-hidden="true">✓</span>
+            <h2>Facility complete</h2>
+            <p className="panel-copy">Principal and fees were repaid successfully.</p>
+            <p className="completion-thanks">Thanks for financing trade with Anora.</p>
+          </div>
+          : <>
+            <h2>Waiting on capital</h2>
+            <p className="panel-copy">{hintFor(facility.stage)}</p>
+          </>)}
 
         {facility.stage === "defaulted" && !reviewing && <>
           <h2>Remit recoveries</h2>

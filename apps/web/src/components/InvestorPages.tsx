@@ -4,6 +4,7 @@ import { AmountInput } from "./AmountInput";
 import { DEFAULT_STAGES, STAGE_LABEL, eventTime, maturityOf, positionValue, waterfallOf, type DemoEvent, type Facility } from "../state/demo";
 
 const toNumber = (value: string) => Number(value.replace(/[^0-9.-]/g, "")) || 0;
+const toAmount = (value: string) => Number(value.replace(/[^0-9-]/g, "")) || 0;
 const usdc = (value: number) => `${Math.round(value).toLocaleString()} USDC`;
 const onDate = (at: number) => new Date(at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
@@ -115,7 +116,7 @@ export function Opportunity({ market, onBack, onSupply, onDone }: { market: Mark
   const value = Number(amount || 0);
   const targetReturnPct = toNumber(market.targetReturn);
   const repayment = Math.round(value * (1 + targetReturnPct / 100));
-  const availableValue = toNumber(market.available);
+  const availableValue = toAmount(market.available);
   const reservePct = toNumber(market.reserve);
 
   return <section className="opportunity-page">
@@ -177,7 +178,7 @@ export function Opportunity({ market, onBack, onSupply, onDone }: { market: Mark
           <small>Your position now tracks this facility until the originator repays.</small>
         </div>}
       </aside>
-      <section className="market-detail-panel"><dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available to invest</dt><dd>{availableValue.toLocaleString()} USDC</dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl><div className="detail-section"><header><strong>Utilization</strong><span>{market.funded}% utilized</span></header><progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress></div><div className="detail-section"><header><strong>Protection before your position</strong><span>{market.reserve} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{market.reserve}</span><span>{Math.max(0, 100 - reservePct)}%</span></div><div className="detail-section-footer"><p>The reserve absorbs losses before your position.</p><button className="text-link">View risk and underwriting</button></div></div><div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>USDC</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>Verified 2 hours ago</dd></div></dl></div><div className="inline-links"><button>Facility documents</button><button>Transaction history</button></div></section>
+      <section className="market-detail-panel"><dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available to invest</dt><dd>{availableValue.toLocaleString("id-ID")} USDC</dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl><div className="detail-section"><header><strong>Utilization</strong><span>{market.funded}% utilized</span></header><progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress></div><div className="detail-section"><header><strong>Protection before your position</strong><span>{market.reserve} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{market.reserve}</span><span>{Math.max(0, 100 - reservePct)}%</span></div><div className="detail-section-footer"><p>The reserve absorbs losses before your position.</p><button className="text-link">View risk and underwriting</button></div></div><div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>USDC</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>Verified 2 hours ago</dd></div></dl></div><div className="inline-links"><button>Facility documents</button><button>Transaction history</button></div></section>
     </div>
   </section>;
 }

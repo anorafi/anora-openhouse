@@ -38,6 +38,9 @@ function Shell() {
   // capital provider is reviewing.
   const [manageId, setManageId] = useState<string | null>(null);
   const managed = facilities.find((facility) => facility.id === manageId);
+  const currentMarket = selectedFacilityId
+    ? facilityAsMarket(facilities.find((facility) => facility.id === selectedFacilityId) ?? facilities[0])
+    : selectedMarket;
 
   const navigate = (next: Page) => {
     setPage(next);
@@ -79,7 +82,7 @@ function Shell() {
           {!deployment ? <NotDeployed /> : <>
             {page === "markets" && <Markets onReview={review} />}
             {page === "opportunity" && <Opportunity
-              market={selectedMarket}
+              market={currentMarket}
               onBack={() => navigate("markets")}
               onSupply={(amount) => { if (selectedFacilityId) supply(selectedFacilityId, amount); }}
               onDone={() => { navigate("portfolio"); setNotice("Capital supplied successfully."); }}

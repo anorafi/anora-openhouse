@@ -139,10 +139,12 @@ function MarketCard({ market, onReview }: { market: Market; onReview: (market: M
     onClick={() => onReview(market)}
     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onReview(market); } }}
   >
-    <header><div><h2>{market.name}</h2><p>{market.type} <span>•</span> {market.route}</p></div><span className={`market-status ${market.status.toLowerCase()}`}><i />{market.status}</span></header>
-    <p className="market-company"><span aria-hidden="true">{market.icon}</span>{market.company}</p>
+    <div className="card-intro">
+      <header><div><h2>{market.name}</h2><p><span>{market.type}</span><span>{market.route}</span></p></div><span className={`market-status ${market.status.toLowerCase()}`}><i />{market.status}</span></header>
+      <p className="market-company"><span aria-hidden="true">{market.icon}</span>{market.company}</p>
+    </div>
     <dl className="market-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available</dt><dd>{market.available}</dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl>
     <div className="funding-row"><span>{market.funded}% utilized</span><progress max="100" value={market.funded}>{market.funded}%</progress></div>
-    <button className="review-button" onClick={(e) => { e.stopPropagation(); onReview(market); }}>View market</button>
+    <button className="review-button" onClick={(e) => { e.stopPropagation(); onReview(market); }}>View market <span aria-hidden="true">→</span></button>
   </article>;
 }

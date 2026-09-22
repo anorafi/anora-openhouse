@@ -427,7 +427,7 @@ export function facilityAsMarket(facility: Facility): Market {
     asset: "USDC",
     status: STAGE_STATUS[facility.stage],
     targetReturn: `${facility.targetReturn}%`,
-    available: `$${Math.round(available).toLocaleString()}`,
+    available: `$${Math.round(available).toLocaleString("id-ID")}`,
     duration: `${facility.durationDays} days`,
     reserve: `${facility.reservePct.toFixed(1)}%`,
     funded: facility.limit > 0 ? Math.min(100, Math.round((facility.supplied / facility.limit) * 100)) : 0,
