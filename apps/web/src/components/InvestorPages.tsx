@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Market } from "./Markets";
 import { AmountInput } from "./AmountInput";
-import { DEFAULT_STAGES, STAGE_LABEL, eventTime, maturityOf, positionValue, waterfallOf, type DemoEvent, type Facility } from "../state/demo";
+import type { Address } from "viem";
+import { useTx } from "../hooks/useTx";
+import { DEFAULT_STAGES, STAGE_LABEL, eventTime, maturityOf, useBook, useMoney, waterfallOf, type BookEvent, type Facility } from "../state/book";
 
 const toNumber = (value: string) => Number(value.replace(/[^0-9.-]/g, "")) || 0;
-const toAmount = (value: string) => Number(value.replace(/[^0-9-]/g, "")) || 0;
-const usdc = (value: number) => `${Math.round(value).toLocaleString()} USDC`;
-const onDate = (at: number) => new Date(at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+const onDate = (at: number) => new Date(at).toDateString() === new Date().toDateString()
+  ? new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  : new Date(at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+const plain = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
 interface Series { labels: string[]; values: number[]; actualThrough: number }
 
@@ -47,8 +50,9 @@ function PortfolioChart({ series }: { series: Series }) {
       const pad = { top: 18, right: 18, bottom: 28, left: 54 };
       const chartWidth = width - pad.left - pad.right;
       const chartHeight = height - pad.top - pad.bottom;
-      const min = Math.floor(Math.min(...values) / 10000) * 10000 - 10000;
-      const max = Math.ceil(Math.max(...values) / 10000) * 10000 + 10000;
+      const unit = 10 ** Math.floor(Math.log10(Math.max(1, ...values)));
+      const min = Math.max(0, Math.floor(Math.min(...values) / unit) * unit - unit);
+      const max = Math.ceil(Math.max(...values) / unit) * unit + unit;
       const x = (index: number) => pad.left + chartWidth * index / (values.length - 1);
       const y = (value: number) => pad.top + chartHeight * (max - value) / (max - min);
 
@@ -60,7 +64,7 @@ function PortfolioChart({ series }: { series: Series }) {
         const value = min + (max - min) * index / 2;
         const lineY = y(value);
         context.beginPath(); context.moveTo(pad.left, lineY); context.lineTo(width - pad.right, lineY); context.stroke();
-        context.fillText(Math.round(value).toLocaleString(), 0, lineY + 4);
+        context.fillText(plain(value), 0, lineY + 4);
       }
       labels.forEach((label, index) => context.fillText(label, x(index) - context.measureText(label).width / 2, height - 5));
 
@@ -80,7 +84,7 @@ function PortfolioChart({ series }: { series: Series }) {
       });
       context.fillStyle = "#121720";
       context.font = '700 12px Inter, "Segoe UI", sans-serif';
-      context.fillText(values[values.length - 1].toLocaleString(), x(values.length - 1) - 48, y(values[values.length - 1]) - 10);
+      context.fillText(plain(values[values.length - 1]), x(values.length - 1) - 48, y(values[values.length - 1]) - 10);
     };
     draw();
     const observer = new ResizeObserver(draw);
@@ -89,13 +93,13 @@ function PortfolioChart({ series }: { series: Series }) {
   }, [series]);
 
   const latest = series.values[series.values.length - 1];
-  return <canvas ref={canvasRef} className="portfolio-chart" role="img" aria-label={`Portfolio value, projected to ${Math.round(latest).toLocaleString()} USDC`} />;
+  return <canvas ref={canvasRef} className="portfolio-chart" role="img" aria-label={`Portfolio value, projected to ${plain(latest)}`} />;
 }
-
-const SUPPLY_STEPS = ["Approve USDC", "Supply capital", "Position created"];
 
 /** Dots on a track: filled behind you, ringed where you are, hollow ahead. */
 function StepRail({ step, complete = false }: { step: number; complete?: boolean }) {
+  const { symbol } = useBook();
+  const SUPPLY_STEPS = [`Approve ${symbol}`, "Supply capital", "Position created"];
   return <ol className="step-rail" style={{ "--progress": step / (SUPPLY_STEPS.length - 1) } as CSSProperties}>
     {SUPPLY_STEPS.map((label, index) => <li
       key={label}
@@ -108,15 +112,18 @@ function StepRail({ step, complete = false }: { step: number; complete?: boolean
 /** Form, then approve, then supply, then the position exists. */
 type Phase = "form" | "approve" | "supply" | "done";
 
-export function Opportunity({ market, onBack, onSupply, onDone }: { market: Market; onBack: () => void; onSupply: (amount: number) => void; onDone: () => void }) {
-  const [amount, setAmount] = useState("120000");
+export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { market: Market; onBack: () => void; onApprove: (amount: number) => Promise<void>; onSupply: (amount: number) => Promise<void>; onDone: () => void }) {
+  const { balance, symbol, me } = useBook();
+  const tx = useTx();
+  const availableValue = toNumber(market.available);
+  const [amount, setAmount] = useState(() => String(Math.min(availableValue, balance) || availableValue));
   const [phase, setPhase] = useState<Phase>("form");
   const [acceptedRisk, setAcceptedRisk] = useState(false);
   const [acceptedLiquidity, setAcceptedLiquidity] = useState(false);
   const value = Number(amount || 0);
   const targetReturnPct = toNumber(market.targetReturn);
-  const repayment = Math.round(value * (1 + targetReturnPct / 100));
-  const availableValue = toAmount(market.available);
+  const repayment = value * (1 + targetReturnPct / 100);
+  const tooMuch = value > availableValue || value > balance;
   const reservePct = toNumber(market.reserve);
 
   return <section className="opportunity-page">
@@ -127,11 +134,12 @@ export function Opportunity({ market, onBack, onSupply, onDone }: { market: Mark
         {phase === "form" && <>
           <h2>Supply</h2>
           <p className="panel-copy">Provide capital to earn a {market.targetReturn} target return.</p>
-          <label>Asset<select><option>USDC</option></select></label>
-          <p className="balance-row"><span>Wallet balance</span><strong>250,000 USDC</strong></p>
-          <label>Amount<AmountInput value={amount} onChange={setAmount} suffix="USDC" action={<button onClick={() => setAmount("250000")}>Max</button>} /></label>
-          <dl className="supply-totals"><div><dt>Estimated repayment</dt><dd>{repayment.toLocaleString()} USDC</dd></div><div><dt>Estimated return</dt><dd>{Math.max(0, repayment - value).toLocaleString()} USDC</dd></div></dl>
-          <button className="accent-button wide" disabled={!value} onClick={() => setPhase("approve")}>Review supply</button>
+          <label>Asset<select><option>{symbol}</option></select></label>
+          <p className="balance-row"><span>Wallet balance</span><strong>{me ? `${plain(balance)} ${symbol}` : "Connect a wallet"}</strong></p>
+          <label>Amount<AmountInput value={amount} onChange={setAmount} suffix={symbol} action={<button onClick={() => setAmount(String(Math.min(balance, availableValue)))}>Max</button>} /></label>
+          <dl className="supply-totals"><div><dt>Estimated repayment</dt><dd>{plain(repayment)} {symbol}</dd></div><div><dt>Estimated return</dt><dd>{plain(Math.max(0, repayment - value))} {symbol}</dd></div></dl>
+          {tooMuch && <p className="facility-warn">{value > availableValue ? `Only ${market.available} is open to supply.` : "More than your wallet balance."}</p>}
+          <button className="accent-button wide" disabled={!value || tooMuch || !me} onClick={() => setPhase("approve")}>Review supply</button>
           <div className="eligibility"><strong>Available to your account</strong><span>Fits your institutional mandate.</span></div>
           <small>Returns depend on repayment. Withdrawals may not be immediately available.</small>
         </>}
@@ -140,72 +148,78 @@ export function Opportunity({ market, onBack, onSupply, onDone }: { market: Mark
           <h2>Review supply</h2>
           <p className="panel-copy">Confirm the details below before supplying capital.</p>
           <dl className="review-list">
-            <div><dt>Supply</dt><dd>{value.toLocaleString()} USDC</dd></div>
+            <div><dt>Supply</dt><dd>{plain(value)} {symbol}</dd></div>
             <div><dt>Market</dt><dd>{market.name}</dd></div>
             <div><dt>Target return</dt><dd>{market.targetReturn}</dd></div>
             <div><dt>Duration</dt><dd>{market.duration}</dd></div>
-            <div><dt>Estimated repayment</dt><dd>{repayment.toLocaleString()} USDC</dd></div>
-            <div><dt>Estimated return</dt><dd className="positive">{Math.max(0, repayment - value).toLocaleString()} USDC</dd></div>
+            <div><dt>Estimated repayment</dt><dd>{plain(repayment)} {symbol}</dd></div>
+            <div><dt>Estimated return</dt><dd className="positive">{plain(Math.max(0, repayment - value))} {symbol}</dd></div>
             <div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div>
-            <div><dt>Available afterward</dt><dd>{Math.max(0, availableValue - value).toLocaleString()} USDC</dd></div>
+            <div><dt>Available afterward</dt><dd>{plain(Math.max(0, availableValue - value))} {symbol}</dd></div>
           </dl>
           <StepRail step={phase === "approve" ? 0 : 1} />
           <label className="review-check"><input type="checkbox" checked={acceptedRisk} onChange={(event) => setAcceptedRisk(event.target.checked)} />Returns depend on buyer repayment.</label>
           <label className="review-check"><input type="checkbox" checked={acceptedLiquidity} onChange={(event) => setAcceptedLiquidity(event.target.checked)} />Withdrawals may be delayed until repayment.</label>
           <div className="review-actions">
-            <button className="secondary-button" onClick={() => setPhase("form")}>Back</button>
+            <button className="secondary-button" disabled={tx.busy} onClick={() => setPhase("form")}>Back</button>
             <button
               className="primary-button"
-              disabled={!acceptedRisk || !acceptedLiquidity}
-              onClick={() => { if (phase === "approve") return setPhase("supply"); onSupply(value); setPhase("done"); }}
-            >{phase === "approve" ? "Approve USDC" : "Supply capital"}</button>
+              disabled={!acceptedRisk || !acceptedLiquidity || tx.busy}
+              onClick={async () => {
+                if (phase === "approve") { if (await tx.run(() => onApprove(value))) setPhase("supply"); return; }
+                if (await tx.run(() => onSupply(value))) setPhase("done");
+              }}
+            >{tx.busy ? "Confirm in wallet…" : phase === "approve" ? `Approve ${symbol}` : "Supply capital"}</button>
           </div>
+          {tx.error && <p className="facility-warn">{tx.error}</p>}
           <small>You will confirm each transaction in your wallet. Anora never takes custody of your wallet.</small>
         </>}
 
         {phase === "done" && <div className="flow-done" role="status">
           <span className="flow-done-mark" aria-hidden="true">✓</span>
           <h2>Position created</h2>
-          <p className="panel-copy">{value.toLocaleString()} USDC supplied to {market.name}.</p>
+          <p className="panel-copy">{plain(value)} {symbol} supplied to {market.name}.</p>
           <StepRail step={2} complete />
           <dl className="review-list">
-            <div><dt>Supplied</dt><dd>{value.toLocaleString()} USDC</dd></div>
+            <div><dt>Supplied</dt><dd>{plain(value)} {symbol}</dd></div>
             <div><dt>Target return</dt><dd>{market.targetReturn}</dd></div>
-            <div><dt>Estimated repayment</dt><dd>{repayment.toLocaleString()} USDC</dd></div>
+            <div><dt>Estimated repayment</dt><dd>{plain(repayment)} {symbol}</dd></div>
             <div><dt>Duration</dt><dd>{market.duration}</dd></div>
           </dl>
           <button className="accent-button wide" onClick={onDone}>View portfolio</button>
           <small>Your position now tracks this facility until the originator repays.</small>
         </div>}
       </aside>
-      <section className="market-detail-panel"><dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available to invest</dt><dd>{availableValue.toLocaleString("id-ID")} USDC</dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl><div className="detail-section"><header><strong>Utilization</strong><span>{market.funded}% utilized</span></header><progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress></div><div className="detail-section"><header><strong>Protection before your position</strong><span>{market.reserve} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{market.reserve}</span><span>{Math.max(0, 100 - reservePct)}%</span></div><div className="detail-section-footer"><p>The reserve absorbs losses before your position.</p><button className="text-link">View risk and underwriting</button></div></div><div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>USDC</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>Verified 2 hours ago</dd></div></dl></div><div className="inline-links"><button>Facility documents</button><button>Transaction history</button></div></section>
+      <section className="market-detail-panel"><dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available to invest</dt><dd>{market.available}</dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl><div className="detail-section"><header><strong>Utilization</strong><span>{market.funded}% utilized</span></header><progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress></div><div className="detail-section"><header><strong>Protection before your position</strong><span>{market.reserve} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{market.reserve}</span><span>{Math.max(0, 100 - reservePct)}%</span></div><div className="detail-section-footer"><p>The reserve absorbs losses before your position.</p><button className="text-link">View risk and underwriting</button></div></div><div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>{symbol}</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Facility contract</dt><dd>{market.id.slice(0, 6)}…{market.id.slice(-4)}</dd></div></dl></div><div className="inline-links"><button>Facility documents</button><button>Transaction history</button></div></section>
     </div>
   </section>;
 }
 
-export function Portfolio({ notice, onView, onActivity, live, onClaim }: { notice: string | null; onView: (id: string) => void; onActivity: () => void; live: Facility[]; onClaim: (id: string) => void }) {
+export function Portfolio({ notice, onView, onActivity, live, onClaim }: { notice: string | null; onView: (id: Address) => void; onActivity: () => void; live: Facility[]; onClaim: (id: Address) => Promise<void> }) {
+  const usdc = useMoney();
+  const tx = useTx();
   const [claiming, setClaiming] = useState(false);
   const [range, setRange] = useState("90D");
 
   // Every figure on this page is a view of the same facility records, so the
   // summary, chart, table, and insights cannot drift apart.
   const positions = useMemo(
-    () => live.filter((facility) => facility.stage !== "settled" && facility.stage !== "closed")
-      .map((facility) => ({ facility, value: positionValue(facility) }))
+    () => live.filter((facility) => facility.holding.value > 0)
+      .map((facility) => ({ facility, value: facility.holding.value }))
       .sort((a, b) => b.value - a.value),
     [live],
   );
-  const supplied = positions.reduce((sum, position) => sum + position.facility.supplied, 0);
+  const supplied = positions.reduce((sum, position) => sum + position.facility.holding.supplied, 0);
   const value = positions.reduce((sum, position) => sum + position.value, 0);
   const claimable = positions.filter((position) => position.facility.stage === "repaid" || position.facility.stage === "recovered");
   const claimTotal = claimable.reduce((sum, position) => sum + position.value, 0);
-  const claimPrincipal = claimable.reduce((sum, position) => sum + position.facility.supplied, 0);
+  const claimPrincipal = claimable.reduce((sum, position) => sum + position.facility.holding.supplied, 0);
   const series = useMemo(() => buildSeries(supplied, value, range), [supplied, value, range]);
 
   const share = (amount: number) => (value > 0 ? (amount / value) * 100 : 0);
   const defaults = live.filter((facility) => facility.stage === "recovered" || facility.stage === "closed");
   const due = positions
-    .filter((position) => position.facility.stage === "funded" || position.facility.stage === "drawn")
+    .filter((position) => position.facility.stage === "funded" || position.facility.stage === "drawn" || position.facility.stage === "late")
     .sort((a, b) => maturityOf(a.facility) - maturityOf(b.facility));
   const exposure = [...positions.reduce((map, position) => {
     const origin = position.facility.route.split("\u2192")[0].trim();
@@ -247,13 +261,13 @@ export function Portfolio({ notice, onView, onActivity, live, onClaim }: { notic
           ? <p className="empty-state">No open positions yet. Supply capital from Markets to start one.</p>
           : positions.map(({ facility, value: amount }) => <div className="table-row" key={facility.id}>
             <span>{facility.name}</span>
-            <span>{usdc(facility.supplied)}</span>
-            <span className={amount < facility.supplied ? "negative" : ""}>{usdc(amount)}</span>
+            <span>{usdc(facility.holding.supplied)}</span>
+            <span className={amount < facility.holding.supplied ? "negative" : ""}>{usdc(amount)}</span>
             <span>{facility.targetReturn}%</span>
             <span>{DEFAULT_STAGES.includes(facility.stage) ? "In default" : onDate(maturityOf(facility))}</span>
             <span className={`market-status ${facility.stage}`}>{STAGE_LABEL[facility.stage]}</span>
             {facility.stage === "repaid" || facility.stage === "recovered"
-              ? <button onClick={() => onClaim(facility.id)}>Claim</button>
+              ? <button disabled={tx.busy} onClick={() => tx.run(() => onClaim(facility.id))}>Claim</button>
               : <button onClick={() => onView(facility.id)}>View</button>}
           </div>)}
       </div>
@@ -292,7 +306,11 @@ export function Portfolio({ notice, onView, onActivity, live, onClaim }: { notic
         <div><dt>Capital supplied</dt><dd>{usdc(claimPrincipal)}</dd></div>
         <div><dt>Net return</dt><dd className={claimTotal >= claimPrincipal ? "positive" : "negative"}>{usdc(claimTotal - claimPrincipal)}</dd></div>
       </dl>
-      <button className="primary-button wide" onClick={() => { claimable.forEach((position) => onClaim(position.facility.id)); setClaiming(false); }}>Confirm claim</button>
+      {tx.error && <p className="facility-warn">{tx.error}</p>}
+      <button className="primary-button wide" disabled={tx.busy} onClick={async () => {
+        const done = await tx.run(async () => { for (const position of claimable) await onClaim(position.facility.id); });
+        if (done) setClaiming(false);
+      }}>{tx.busy ? "Confirm in wallet…" : "Confirm claim"}</button>
       <button className="secondary-button wide" onClick={() => setClaiming(false)}>Cancel</button>
     </div></div>}
   </section>;
@@ -301,12 +319,12 @@ export function Portfolio({ notice, onView, onActivity, live, onClaim }: { notic
 const INVESTOR_FILTERS = ["All", "Supplies", "Repayments", "Credit"];
 
 /** Which filter tab an entry belongs to. */
-function bucketFor(event: DemoEvent) {
+function bucketFor(event: BookEvent) {
   if (event.actor === "Keeper") return "Credit";
   return event.event.startsWith("Capital supplied") ? "Supplies" : "Repayments";
 }
 
-export function Activity({ events = [] }: { events?: DemoEvent[] }) {
+export function Activity({ events = [] }: { events?: BookEvent[] }) {
   const [filter, setFilter] = useState("All");
   const visible = events.filter((event) => filter === "All" || bucketFor(event) === filter);
 

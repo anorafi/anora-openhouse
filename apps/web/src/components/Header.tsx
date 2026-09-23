@@ -31,7 +31,7 @@ function Chevron() {
   );
 }
 
-export function Header({ onReset }: { onReset: () => void }) {
+export function Header() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { connect, connectors, isPending: isConnecting } = useConnect();
@@ -42,29 +42,12 @@ export function Header({ onReset }: { onReset: () => void }) {
   const currentChain = SELECTABLE_CHAINS.find((chain) => chain.id === chainId);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useDismiss(menuOpen, setMenuOpen);
-  const [resetOpen, setResetOpen] = useState(false);
-  const resetRef = useDismiss(resetOpen, setResetOpen);
 
   const injectedConnector = connectors.find((c) => c.type === "injected") ?? connectors[0];
 
   return (
     <header className="header">
       <div className="header-actions">
-        <div className="reset-select" ref={resetRef}>
-          <button type="button" className="reset-button" onClick={() => setResetOpen((open) => !open)} aria-haspopup="menu" aria-expanded={resetOpen}>
-            Reset
-          </button>
-          {resetOpen && (
-            <div className="reset-menu" role="menu">
-              <strong>Reset the demo</strong>
-              <p>Clears everything you have supplied, drawn, repaid, claimed, and opened, and restores the book a first-time visitor sees.</p>
-              <div className="reset-actions">
-                <button role="menuitem" className="secondary-button" onClick={() => setResetOpen(false)}>Cancel</button>
-                <button role="menuitem" className="primary-button" onClick={() => { onReset(); setResetOpen(false); }}>Reset</button>
-              </div>
-            </div>
-          )}
-        </div>
         <div className="network-select" ref={menuRef}>
           <button type="button" className="network-current" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={menuOpen}>
             <span className="network-dot" aria-hidden="true" />
