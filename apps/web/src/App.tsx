@@ -25,7 +25,7 @@ export function App() {
 
 function Shell() {
   const deployment = useDeployment();
-  const { facilities, events, supply, claim, reset } = useDemo();
+  const { facilities, events, latestSupplyId, supply, claim, reset } = useDemo();
   const initialPage = window.location.hash.slice(1) as Page;
   const [page, setPage] = useState<Page>(PAGES.includes(initialPage) ? initialPage : "home");
   const [role, setRole] = useState<Role>("investor");
@@ -71,7 +71,7 @@ function Shell() {
     navigate("opportunity");
   };
 
-  if (page === "home") return <div className="app"><Landing onNavigate={navigate} /></div>;
+  if (page === "home") return <div className="app"><Landing onExplore={() => switchRole("investor")} onMarket={(market) => { setRole("investor"); review(market); }} onOriginator={() => switchRole("originator")} /></div>;
 
   return (
     <div className="app shell">
@@ -80,15 +80,16 @@ function Shell() {
         <Header onReset={resetDemo} />
         <main className="main">
           {!deployment ? <NotDeployed /> : <>
-            {page === "markets" && <Markets onReview={review} />}
+            {page === "markets" && <Markets onReview={review} onPortfolio={() => navigate("portfolio")} onHistory={() => navigate("activity")} />}
             {page === "opportunity" && <Opportunity
               market={currentMarket}
               onBack={() => navigate("markets")}
-              onSupply={(amount) => { if (selectedFacilityId) supply(selectedFacilityId, amount); }}
-              onDone={() => { navigate("portfolio"); setNotice("Capital supplied successfully."); }}
+              onSupply={(amount) => selectedFacilityId ? supply(selectedFacilityId, amount) : false}
+              onDone={() => navigate("portfolio")}
             />}
             {page === "portfolio" && <Portfolio
               notice={notice}
+              latestSupplyId={latestSupplyId}
               live={facilities.filter((facility) => facility.supplied > 0)}
               onClaim={(id) => { claim(id); setNotice("Principal and return claimed."); }}
               onView={(id) => { const facility = facilities.find((item) => item.id === id); if (facility) review(facilityAsMarket(facility)); }}

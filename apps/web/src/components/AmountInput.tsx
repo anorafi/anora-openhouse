@@ -33,7 +33,7 @@ export function AmountInput({ value, onChange, suffix, action }: {
     <input
       ref={ref}
       inputMode="decimal"
-      value={value ? Number(value).toLocaleString() : ""}
+      value={value ? Number(value).toLocaleString("en-US") : ""}
       onChange={(event) => {
         const caret = event.target.selectionStart ?? event.target.value.length;
         digitsBefore.current = event.target.value.slice(0, caret).replace(/\D/g, "").length;

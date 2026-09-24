@@ -1,9 +1,10 @@
+import { TokenAmount } from "./TokenAmount";
 import { useMemo, useState } from "react";
 import { FilterBar, presentOptions } from "./FilterBar";
-import { facilityAsMarket, owedOn, useDemo, type Facility } from "../state/demo";
+import { facilityAsMarket, owedOn, useDemo, marketAction, type Facility } from "../state/demo";
 
 export type MarketStatus = "Open" | "Funding" | "Active" | "Paused" | "Repaid" | "Settled" | "Defaulted" | "Recovered" | "Closed";
-export type Market = { name: string; type: string; route: string; company: string; icon: string; asset: string; status: MarketStatus; targetReturn: string; available: string; duration: string; reserve: string; funded: number };
+export type Market = { name: string; type: string; route: string; company: string; icon: string; asset: string; status: MarketStatus; targetReturn: string; available: string; duration: string; reserve: string; funded: number; accepting: boolean; fundingLabel: string; action: ReturnType<typeof marketAction> };
 
 const categories = ["All", "Export receivables", "Supply-chain finance", "Commodity finance"];
 type TabVariant = "all" | "export" | "supply" | "commodity";
@@ -73,7 +74,13 @@ const DURATIONS: Array<{ label: string; holds: (facility: Facility) => boolean }
 
 const usdM = (value: number) => `$${(value / 1_000_000).toFixed(2)}M`;
 
-export function Markets({ onReview }: { onReview: (market: Market) => void }) {
+export function Markets({ onReview, onPortfolio, onHistory }: { onReview: (market: Market) => void; onPortfolio: () => void; onHistory: () => void }) {
+  const openMarket = (market: Market) => {
+    if (market.action === "Funding closed") return;
+    if (market.action === "View history") return onHistory();
+    if (market.action === "View position" || market.action === "Claim funds") return onPortfolio();
+    onReview(market);
+  };
   const { facilities } = useDemo();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
@@ -126,10 +133,10 @@ export function Markets({ onReview }: { onReview: (market: Market) => void }) {
       ]}
     />
     {view === "grid"
-      ? <div className="market-cards">{visible.map(({ market }) => <MarketCard key={market.name} market={market} onReview={onReview} />)}</div>
+      ? <div className="market-cards">{visible.map(({ market }) => <MarketCard key={market.name} market={market} onReview={openMarket} />)}</div>
       : <div className="market-list">
           <div className="market-list-head" aria-hidden="true"><span>Opportunity</span><span>Type</span><span>Route</span><span>Company</span><span>Target return</span><span>Available</span><span>Utilized</span><span>Duration</span><span /></div>
-          {visible.map(({ market }) => <MarketListRow key={market.name} market={market} onReview={onReview} />)}
+          {visible.map(({ market }) => <MarketListRow key={market.name} market={market} onReview={openMarket} />)}
         </div>}
     {visible.length === 0 && <p className="empty-state">No opportunities match these filters.</p>}
     <p className="market-note"><span aria-hidden="true">ⓘ</span> Each market is isolated. Performance and losses do not transfer between facilities.</p>
@@ -139,27 +146,28 @@ export function Markets({ onReview }: { onReview: (market: Market) => void }) {
 function MarketListRow({ market, onReview }: { market: Market; onReview: (market: Market) => void }) {
   return <article className={`market-list-row status-${market.status.toLowerCase()}`}>
     <div className="list-name"><strong>{market.name}</strong><span className={`market-status ${market.status.toLowerCase()}`}><i />{market.status}</span></div>
-    <span>{market.type}</span><span>{market.route}</span><span>{market.company}</span><strong>{market.targetReturn}</strong><strong>{market.available}</strong>
-    <div className="list-utilization"><span>{market.funded}%</span><progress max="100" value={market.funded}>{market.funded}%</progress></div>
+    <span>{market.type} · {market.asset}</span><span>{market.route}</span><span>{market.company}</span><strong>{market.targetReturn}</strong><strong>{market.accepting ? <TokenAmount value={market.available.replace(/^\$/, "")} asset={market.asset} /> : "Closed"}</strong>
+    <div className="list-utilization"><span>{market.fundingLabel}</span>{market.accepting && <progress max="100" value={market.funded}>{market.funded}%</progress>}</div>
     <strong>{market.duration}</strong>
-    <button className="list-action" onClick={() => onReview(market)}>View market <span aria-hidden="true">→</span></button>
+    <button className="list-action" disabled={market.action === "Funding closed"} onClick={() => onReview(market)}>{market.action === "Funding closed" && <span aria-hidden="true">🔒</span>}{market.action} {market.action !== "Funding closed" && <span aria-hidden="true">→</span>}</button>
   </article>;
 }
 
-function MarketCard({ market, onReview }: { market: Market; onReview: (market: Market) => void }) {
+export function MarketCard({ market, onReview }: { market: Market; onReview: (market: Market) => void }) {
   return <article
     className={`market-card status-${market.status.toLowerCase()}`}
     role="button"
-    tabIndex={0}
+    aria-disabled={market.action === "Funding closed"}
+    tabIndex={market.action === "Funding closed" ? -1 : 0}
     onClick={() => onReview(market)}
     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onReview(market); } }}
   >
     <div className="card-intro">
-      <header><div><h2>{market.name}</h2><p><span>{market.type}</span><span>{market.route}</span></p></div><span className={`market-status ${market.status.toLowerCase()}`}><i />{market.status}</span></header>
+      <header><div><h2>{market.name}</h2><p><span>{market.type} · {market.asset}</span><span>{market.route}</span></p></div><span className={`market-status ${market.status.toLowerCase()}`}><i />{market.status}</span></header>
       <p className="market-company"><span aria-hidden="true">{market.icon}</span>{market.company}</p>
     </div>
-    <dl className="market-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available</dt><dd>{market.available}</dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl>
-    <div className="funding-row"><span>{market.funded}% utilized</span><progress max="100" value={market.funded}>{market.funded}%</progress></div>
-    <button className="review-button" onClick={(e) => { e.stopPropagation(); onReview(market); }}>View market <span aria-hidden="true">→</span></button>
+    <dl className="market-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available</dt><dd><TokenAmount value={market.available.replace(/^\$/, "")} asset={market.asset} /></dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl>
+    <div className="funding-row"><span>{market.fundingLabel}</span>{market.accepting && <progress max="100" value={market.funded}>{market.funded}%</progress>}</div>
+    <button className="review-button" disabled={market.action === "Funding closed"} onClick={(e) => { e.stopPropagation(); onReview(market); }}>{market.action === "Funding closed" && <span aria-hidden="true">🔒</span>}{market.action} {market.action !== "Funding closed" && <span aria-hidden="true">→</span>}</button>
   </article>;
 }

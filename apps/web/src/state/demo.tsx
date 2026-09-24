@@ -37,6 +37,7 @@ export const ORIGINATOR_ACTION: Record<Stage, string | null> = {
 };
 
 export interface Facility {
+  asset: "USDC" | "USDG";
   id: string;
   name: string;
   company: string;
@@ -68,6 +69,7 @@ export interface DemoEvent {
 }
 
 export interface NewFacility {
+  asset?: "USDC" | "USDG";
   icon?: string;
   name: string;
   company: string;
@@ -82,8 +84,9 @@ export interface NewFacility {
 interface DemoValue {
   facilities: Facility[];
   events: DemoEvent[];
+  latestSupplyId: string | null;
   createFacility: (input: NewFacility) => void;
-  supply: (id: string, amount: number) => void;
+  supply: (id: string, amount: number) => boolean;
   draw: (id: string) => void;
   repay: (id: string) => void;
   claim: (id: string) => void;
@@ -121,6 +124,7 @@ const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items
 const step = (min: number, max: number, to: number) => Math.round((min + Math.random() * (max - min)) / to) * to;
 
 export interface FacilityDraft {
+  asset: string;
   name: string; company: string; route: string; type: string; icon: string;
   limit: string; firstLoss: string; targetReturn: string; duration: string;
 }
@@ -132,6 +136,7 @@ export function randomDraft(taken: readonly string[] = []): FacilityDraft {
   const limit = step(150_000, 600_000, 10_000);
   const reservePct = step(15, 30, 1);
   return {
+    asset: pick(["USDC", "USDG"]),
     name: `${base.name} ${String(step(2, 48, 1)).padStart(2, "0")}`,
     company: base.company,
     route: base.route,
@@ -163,6 +168,7 @@ function seed(
   const drawn = stage === "open" || stage === "funded" ? 0 : supplied;
   return {
     ...entry,
+    asset: Number(suffix) % 2 ? "USDG" : "USDC",
     id: `seed-${suffix}`,
     name: `${entry.name} ${suffix}`,
     targetReturn,
@@ -196,7 +202,7 @@ function seedFacilities(): Facility[] {
 
 const DemoContext = createContext<DemoValue | null>(null);
 
-const usd = (value: number) => `${Math.round(value).toLocaleString()} USDC`;
+const usd = (value: number, asset: string) => `${Math.round(value).toLocaleString()} ${asset}`;
 
 /** Principal plus the facility's financing fee. */
 export function owedOn(facility: Facility) {
@@ -252,15 +258,18 @@ export function waterfallOf(facility: Facility): Waterfall {
   };
 }
 
-/** What a supplier's position is worth: principal until drawn, then principal plus fee. */
+/** Demo estimate: unpaid principal, actual repayment, or known default proceeds. */
 export function positionValue(facility: Facility) {
-  // Until recoveries are remitted the split is not settled, so the position is
-  // still carried at what was supplied rather than at the zero-recovery floor.
-  if (facility.stage === "defaulted") return facility.supplied;
+  if (facility.stage === "defaulted") return waterfallOf(facility).supplierProceeds;
   if (facility.stage === "recovered" || facility.stage === "closed") return waterfallOf(facility).supplierProceeds;
   if (facility.repaid > 0) return facility.repaid;
-  if (facility.drawn > 0) return owedOn(facility);
   return facility.supplied;
+}
+
+export function realizedReturn(facility: Facility) {
+  if (facility.stage === "repaid" || facility.stage === "settled") return facility.repaid - facility.supplied;
+  if (facility.stage === "recovered" || facility.stage === "closed") return waterfallOf(facility).supplierProceeds - facility.supplied;
+  return 0;
 }
 
 /**
@@ -287,7 +296,7 @@ function seedEvents(facilities: Facility[]): DemoEvent[] {
       actor,
       event,
       facility: facility.name,
-      amount: usd(amount),
+      amount: usd(amount, facility.asset),
     }));
   }).sort((a, b) => b.at - a.at);
 }
@@ -296,6 +305,7 @@ function seedEvents(facilities: Facility[]): DemoEvent[] {
 export function DemoProvider({ children }: { children: ReactNode }) {
   const [facilities, setFacilities] = useState<Facility[]>(seedFacilities);
   const [events, setEvents] = useState<DemoEvent[]>(() => seedEvents(facilities));
+  const [latestSupplyId, setLatestSupplyId] = useState<string | null>(null);
 
   /** Back to the book a first-time visitor sees. Returns it so callers can
    *  drop references to the records they were holding. */
@@ -303,6 +313,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     const fresh = seedFacilities();
     setFacilities(fresh);
     setEvents(seedEvents(fresh));
+    setLatestSupplyId(null);
     return fresh;
   }, []);
 
@@ -320,6 +331,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const createFacility = useCallback((input: NewFacility) => {
     const facility: Facility = {
       ...input,
+      asset: input.asset ?? "USDC",
       id: `f-${Date.now()}`,
       icon: input.icon ?? "◈",
       recovered: 0,
@@ -331,13 +343,16 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       stage: "open",
     };
     setFacilities((prev) => [facility, ...prev]);
-    log("Originator", "Facility opened, first-loss staked", facility.name, usd(input.firstLoss));
+    log("Originator", "Facility opened, first-loss staked", facility.name, usd(input.firstLoss, facility.asset));
   }, [log]);
 
   const supply = useCallback((id: string, amount: number) => {
-    patch(id, (facility) => ({ ...facility, supplied: facility.supplied + amount, stage: "funded" }));
     const facility = facilities.find((item) => item.id === id);
-    if (facility) log("Investor", "Capital supplied", facility.name, usd(amount));
+    if (!facility || !Number.isFinite(amount) || amount <= 0 || amount > fundingState(facility).available) return false;
+    patch(id, (current) => ({ ...current, supplied: current.supplied + amount, stage: "funded" }));
+    log("Investor", "Capital supplied", facility.name, usd(amount, facility.asset));
+    setLatestSupplyId(id);
+    return true;
   }, [facilities, log, patch]);
 
   const draw = useCallback((id: string) => {
@@ -345,7 +360,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     if (!facility) return;
     const amount = Math.min(facility.supplied, facility.limit);
     patch(id, (item) => ({ ...item, drawn: amount, stage: "drawn" }));
-    log("Originator", "Liquidity drawn", facility.name, usd(amount));
+    log("Originator", "Liquidity drawn", facility.name, usd(amount, facility.asset));
   }, [facilities, log, patch]);
 
   const repay = useCallback((id: string) => {
@@ -353,12 +368,12 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     if (!facility) return;
     const amount = owedOn(facility);
     patch(id, (item) => ({ ...item, repaid: amount, stage: "repaid" }));
-    log("Originator", "Principal and fees repaid", facility.name, usd(amount));
+    log("Originator", "Principal and fees repaid", facility.name, usd(amount, facility.asset));
   }, [facilities, log, patch]);
 
   /** Announce that the balance is settled and the position can be claimed. */
   const openDistribution = useCallback((facility: Facility, recovered: number) => {
-    log("Keeper", "Balance cleared, distribution available", facility.name, usd(waterfallOf({ ...facility, recovered }).supplierProceeds));
+    log("Keeper", "Balance cleared, distribution available", facility.name, usd(waterfallOf({ ...facility, recovered }).supplierProceeds, facility.asset));
   }, [log]);
 
   /**
@@ -373,7 +388,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     const total = facility.recovered + paid;
     const covered = total >= owed - 0.5;
     patch(id, (item) => ({ ...item, recovered: total, stage: covered ? "recovered" : "defaulted" }));
-    log("Originator", covered ? "Balance cleared in full" : "Payment remitted", facility.name, usd(paid));
+    log("Originator", covered ? "Balance cleared in full" : "Payment remitted", facility.name, usd(paid, facility.asset));
     if (covered) openDistribution(facility, total);
   }, [facilities, log, openDistribution, patch]);
 
@@ -383,16 +398,16 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     if (facility.stage === "recovered") {
       const flow = waterfallOf(facility);
       patch(id, (item) => ({ ...item, stage: "closed" }));
-      log("Investor", "Recovery distribution claimed", facility.name, usd(flow.supplierProceeds));
+      log("Investor", "Recovery distribution claimed", facility.name, usd(flow.supplierProceeds, facility.asset));
       return;
     }
     patch(id, (item) => ({ ...item, stage: "settled" }));
-    log("Investor", "Principal and return claimed", facility.name, usd(facility.repaid));
+    log("Investor", "Principal and return claimed", facility.name, usd(facility.repaid, facility.asset));
   }, [facilities, log, patch]);
 
   const value = useMemo(
-    () => ({ facilities, events, createFacility, supply, draw, repay, claim, recover, reset }),
-    [facilities, events, createFacility, supply, draw, repay, claim, recover, reset],
+    () => ({ facilities, events, latestSupplyId, createFacility, supply, draw, repay, claim, recover, reset }),
+    [facilities, events, latestSupplyId, createFacility, supply, draw, repay, claim, recover, reset],
   );
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
@@ -415,21 +430,48 @@ const STAGE_STATUS: Record<Stage, MarketStatus> = {
   closed: "Closed",
 };
 
+export function fundingState(facility: Facility) {
+  const accepting = facility.stage === "open" || facility.stage === "funded";
+  const available = accepting ? Math.max(0, facility.limit - facility.supplied) : 0;
+  const percent = facility.limit > 0 ? Math.min(100, Math.round(facility.supplied / facility.limit * 100)) : 0;
+  const label = accepting ? `${percent}% funded` : ({
+    drawn: "Funding closed",
+    repaid: "Repaid · ready to claim",
+    settled: "Settled · complete",
+    defaulted: "In default",
+    recovered: "Recovery ready to claim",
+    closed: "Closed at loss",
+  } as Partial<Record<Stage, string>>)[facility.stage]!;
+  return { accepting, available, percent, label };
+}
+
 /** Render a facility through the existing investor market components. */
 export function facilityAsMarket(facility: Facility): Market {
-  const available = Math.max(0, facility.limit - facility.supplied);
+  const funding = fundingState(facility);
+  const available = funding.available;
   return {
     name: facility.name,
     type: facility.type,
     route: facility.route,
     company: facility.company,
     icon: facility.icon,
-    asset: "USDC",
+    asset: facility.asset,
     status: STAGE_STATUS[facility.stage],
     targetReturn: `${facility.targetReturn}%`,
     available: `$${Math.round(available).toLocaleString("id-ID")}`,
     duration: `${facility.durationDays} days`,
     reserve: `${facility.reservePct.toFixed(1)}%`,
-    funded: facility.limit > 0 ? Math.min(100, Math.round((facility.supplied / facility.limit) * 100)) : 0,
+    funded: funding.percent,
+    accepting: funding.accepting,
+    fundingLabel: funding.label,
+    action: marketAction(facility),
   };
+}
+
+export function marketAction(facility: Facility): "View market" | "View position" | "Claim funds" | "View history" | "Funding closed" {
+  if (fundingState(facility).available > 0) return "View market";
+  if (facility.supplied <= 0) return "Funding closed";
+  if (facility.stage === "repaid" || facility.stage === "recovered") return "Claim funds";
+  if (facility.stage === "settled" || facility.stage === "closed") return "View history";
+  return "View position";
 }

@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { arbitrumSepolia } from "wagmi/chains";
-import { AddressLink } from "./AddressLink";
 import { robinhood } from "../config/wagmi";
-import { useDeployment } from "../hooks/useDeployment";
 import { useIsRiskAgent } from "../hooks/useFactory";
 import { shortenAddress } from "../lib/format";
 
@@ -38,7 +36,6 @@ export function Header({ onReset }: { onReset: () => void }) {
   const { disconnect } = useDisconnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const isRiskAgent = useIsRiskAgent(address);
-  const deployment = useDeployment();
   const currentChain = SELECTABLE_CHAINS.find((chain) => chain.id === chainId);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useDismiss(menuOpen, setMenuOpen);
@@ -77,7 +74,7 @@ export function Header({ onReset }: { onReset: () => void }) {
                 <button
                   key={chain.id}
                   role="menuitem"
-                  disabled={isSwitching || !isConnected}
+                  disabled={isSwitching}
                   onClick={() => { switchChain({ chainId: chain.id }); setMenuOpen(false); }}
                 >
                   Switch to {chain.name}
@@ -87,7 +84,6 @@ export function Header({ onReset }: { onReset: () => void }) {
           )}
         </div>
         {isConnected && !currentChain && <span className="btn-warn">Unsupported network</span>}
-        {deployment && <AddressLink className="pool-link" address={deployment.factory} />}
         {isConnected && address ? (
           <div className="account-pill">
             {isRiskAgent && <span className="badge badge-risk">risk agent</span>}
