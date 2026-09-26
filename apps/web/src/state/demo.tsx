@@ -487,6 +487,8 @@ export function facilityAsMarket(facility: Facility): Market {
     available: `$${Math.round(available).toLocaleString("id-ID")}`,
     duration: `${facility.durationDays} days`,
     reserve: `${facility.reservePct.toFixed(1)}%`,
+    seniorPct: facility.seniorPct,
+    juniorPct: facility.juniorPct,
     funded: funding.percent,
     accepting: funding.accepting,
     fundingLabel: funding.label,

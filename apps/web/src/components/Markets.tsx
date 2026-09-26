@@ -4,7 +4,7 @@ import { FilterBar, presentOptions } from "./FilterBar";
 import { facilityAsMarket, owedOn, useDemo, marketAction, type Facility } from "../state/demo";
 
 export type MarketStatus = "Open" | "Funding" | "Active" | "Paused" | "Repaid" | "Settled" | "Defaulted" | "Recovered" | "Closed";
-export type Market = { name: string; type: string; route: string; company: string; icon: string; asset: string; status: MarketStatus; targetReturn: string; available: string; duration: string; reserve: string; funded: number; accepting: boolean; fundingLabel: string; action: ReturnType<typeof marketAction> };
+export type Market = { name: string; type: string; route: string; company: string; icon: string; asset: string; status: MarketStatus; targetReturn: string; available: string; duration: string; reserve: string; seniorPct: number; juniorPct: number; funded: number; accepting: boolean; fundingLabel: string; action: ReturnType<typeof marketAction> };
 
 const categories = ["All", "Export receivables", "Supply-chain finance", "Commodity finance"];
 type TabVariant = "all" | "export" | "supply" | "commodity";

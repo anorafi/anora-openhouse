@@ -71,6 +71,30 @@ function PortfolioChart({ series }: { series: ReturnType<typeof repaymentProject
 }
 const SUPPLY_STEPS = ["Approve asset", "Supply capital", "Position created"];
 
+export function facilityReview(market: Market) {
+  const seed = [...`${market.name}${market.route}${market.company}`].reduce((sum, character) => sum + character.charCodeAt(0), 0);
+  const grade = ["A", "A−", "B+"][seed % 3];
+  const typeDocument = market.type === "Export receivables"
+    ? "Receivables and invoice schedule"
+    : market.type === "Supply-chain finance"
+      ? "Purchase-order package"
+      : "Inventory and collateral report";
+  return {
+    grade,
+    reviewed: `${2 + seed % 17} days ago`,
+    history: `${3 + seed % 8} years reviewed`,
+    verifiedAssets: 8 + seed % 23,
+    concentration: 22 + seed % 27,
+    coverage: (1.12 + (seed % 24) / 100).toFixed(2),
+    documents: [
+      ["Credit memorandum", `CM-${String(seed).slice(-4).padStart(4, "0")}`, "Approved"],
+      [typeDocument, `${8 + seed % 23} assets`, "Verified"],
+      ["Originator servicing agreement", market.company, "Executed"],
+      ["KYC and beneficial ownership", market.company, "Verified"],
+    ],
+  };
+}
+
 /** Dots on a track: filled behind you, ringed where you are, hollow ahead. */
 function StepRail({ step, complete = false }: { step: number; complete?: boolean }) {
   return <ol className="step-rail" style={{ "--progress": step / (SUPPLY_STEPS.length - 1) } as CSSProperties}>
@@ -91,12 +115,14 @@ export function Opportunity({ market, onBack, onSupply, onDone }: { market: Mark
   const [acceptedRisk, setAcceptedRisk] = useState(false);
   const [acceptedLiquidity, setAcceptedLiquidity] = useState(false);
   const [supplyError, setSupplyError] = useState("");
+  const [reviewPanel, setReviewPanel] = useState<"risk" | "documents" | null>(null);
   const value = Number(amount || 0);
   const targetReturnPct = toNumber(market.targetReturn);
   const repayment = Math.round(value * (1 + targetReturnPct / 100));
   const availableValue = toAmount(market.available);
   const validAmount = Number.isFinite(value) && value > 0 && value <= Math.min(250000, availableValue) && market.accepting;
   const reservePct = toNumber(market.reserve);
+  const review = facilityReview(market);
 
   return <section className="opportunity-page">
     <button className="back-link" onClick={onBack}><span aria-hidden="true">←</span> Back to Markets</button>
@@ -158,8 +184,25 @@ export function Opportunity({ market, onBack, onSupply, onDone }: { market: Mark
           <small>Your position now tracks this facility until the originator repays.</small>
         </div>}
       </aside>
-      <section className="market-detail-panel"><dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available to invest</dt><dd><TokenAmount value={availableValue} asset={market.asset} /></dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl><div className="detail-section"><header><strong>Funding</strong><span>{market.fundingLabel}</span></header>{market.accepting && <progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress>}</div><div className="detail-section"><header><strong>Protection before your position</strong><span>{market.reserve} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{market.reserve}</span><span>{Math.max(0, 100 - reservePct)}%</span></div><div className="detail-section-footer"><p>The reserve absorbs losses before your position.</p><button className="text-link">View risk and underwriting</button></div></div><div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>{market.asset}</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>Verified 2 hours ago</dd></div></dl></div><div className="inline-links"><button>Facility documents</button><button>Transaction history</button></div></section>
+      <section className="market-detail-panel"><dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available to invest</dt><dd><TokenAmount value={availableValue} asset={market.asset} /></dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl><div className="detail-section"><header><strong>Funding</strong><span>{market.fundingLabel}</span></header>{market.accepting && <progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress>}</div><div className="detail-section"><header><strong>Protection before your position</strong><span>{market.reserve} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{market.reserve}</span><span>{Math.max(0, 100 - reservePct)}%</span></div><div className="detail-section-footer"><p>The reserve absorbs losses before your position.</p><button className="text-link" onClick={() => setReviewPanel("risk")}>View risk and underwriting</button></div></div><div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>{market.asset}</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>Verified 2 hours ago</dd></div></dl></div><div className="inline-links"><button onClick={() => setReviewPanel("documents")}>Facility documents</button><button>Transaction history</button></div></section>
     </div>
+    {reviewPanel && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setReviewPanel(null); }}><div className="modal facility-review-modal" role="dialog" aria-modal="true" aria-labelledby="facility-review-title">
+      <button className="modal-close" aria-label="Close" onClick={() => setReviewPanel(null)}>×</button>
+      <span className="review-kicker">{reviewPanel === "risk" ? "Curator-approved" : "Facility data room"}</span>
+      <h2 id="facility-review-title">{reviewPanel === "risk" ? "Risk and underwriting" : "Facility documents"}</h2>
+      <p>{market.name} · {market.route}</p>
+      {reviewPanel === "risk" ? <>
+        <div className="underwriting-grade"><strong>{review.grade}</strong><div><span>Underwriting grade</span><small>Reviewed {review.reviewed}</small></div></div>
+        <dl className="underwriting-metrics">
+          <div><dt>Operating history</dt><dd>{review.history}</dd></div>
+          <div><dt>Verified trade assets</dt><dd>{review.verifiedAssets}</dd></div>
+          <div><dt>Largest buyer exposure</dt><dd>{review.concentration}%</dd></div>
+          <div><dt>Document coverage</dt><dd>{review.coverage}×</dd></div>
+        </dl>
+        <div className="review-waterfall"><span style={{ width: `${market.seniorPct}%` }}>Senior {market.seniorPct.toFixed(1)}%</span><span style={{ width: `${market.juniorPct}%` }}>Junior {market.juniorPct.toFixed(1)}%</span><span style={{ width: `${reservePct}%` }}>Reserve {market.reserve}</span></div>
+        <p className="review-note">Approved within the facility’s concentration, documentation, servicing, and first-loss limits.</p>
+      </> : <div className="document-list">{review.documents.map(([title, detail, status]) => <article key={title}><div><strong>{title}</strong><small>{detail}</small></div><span>✓ {status}</span></article>)}</div>}
+    </div></div>}
   </section>;
 }
 

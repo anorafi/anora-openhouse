@@ -389,6 +389,32 @@ progress::-moz-progress-bar { background: var(--fill); border-radius: 999px; }
 .modal-close { position: absolute; top: 10px; right: 12px; padding: 4px; background: transparent; border: 0; font-size: 20px; }
 .claim-amount { display: block; margin: 20px 0; font-size: 24px; font-weight: 700; }
 .modal .secondary-button { margin-top: 10px; }
+.facility-review-modal { width: min(560px, 100%); text-align: left; }
+.facility-review-modal > p { margin: 6px 0 20px; }
+.review-kicker { display: inline-block; margin-bottom: 9px; color: var(--accent-ink); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.underwriting-grade { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--accent-soft); border: 1px solid #dce8a5; border-radius: 8px; }
+.underwriting-grade > strong { display: grid; place-items: center; width: 46px; height: 46px; background: var(--accent); border-radius: 50%; font-size: 18px; }
+.underwriting-grade div { display: grid; gap: 3px; }
+.underwriting-grade span { font-weight: 700; }
+.underwriting-grade small { color: var(--muted); }
+.underwriting-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; margin: 18px 0; border: 1px solid var(--line); border-radius: 8px; }
+.underwriting-metrics div { padding: 13px 14px; }
+.underwriting-metrics div:nth-child(odd) { border-right: 1px solid var(--line); }
+.underwriting-metrics div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+.underwriting-metrics dt { font-size: 10px; }
+.underwriting-metrics dd { margin: 5px 0 0; font-size: 13px; font-weight: 700; }
+.review-waterfall { display: flex; height: 34px; overflow: hidden; border-radius: 7px; }
+.review-waterfall span { display: grid; place-items: center; min-width: 0; overflow: hidden; color: #fff; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.review-waterfall span:nth-child(1) { background: var(--fill); }
+.review-waterfall span:nth-child(2) { background: #737d8b; }
+.review-waterfall span:nth-child(3) { color: var(--ink); background: var(--accent); }
+.facility-review-modal .review-note { margin: 13px 0 0; font-size: 11px; }
+.document-list { display: grid; border-top: 1px solid var(--line); }
+.document-list article { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.document-list article div { display: grid; gap: 4px; }
+.document-list article strong { font-size: 12px; }
+.document-list article small { color: var(--muted); font-size: 10px; }
+.document-list article > span { flex-shrink: 0; color: var(--success); font-size: 10px; font-weight: 700; }
 
 .activity-filters { display: flex; gap: 8px; margin: 20px 0 12px; flex-wrap: wrap; }
 .activity-filters button { min-height: 38px; padding: 0 16px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; font-size: 12.5px; font-weight: 600; }
