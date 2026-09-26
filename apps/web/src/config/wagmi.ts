@@ -19,7 +19,7 @@ const alchemyKey = import.meta.env.VITE_ALCHEMY_API_KEY as string | undefined;
 const rpc = (alchemyHost: string, fallback: string) => (alchemyKey ? `https://${alchemyHost}.g.alchemy.com/v2/${alchemyKey}` : fallback);
 
 export const wagmiConfig = createConfig({
-  chains: [arbitrumSepolia, robinhood],
+  chains: [robinhood, arbitrumSepolia],
   connectors: [injected()],
   transports: {
     [arbitrumSepolia.id]: http(rpc("arb-sepolia", "https://sepolia-rollup.arbitrum.io/rpc")),

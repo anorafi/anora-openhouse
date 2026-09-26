@@ -1,65 +1,114 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Header } from "./components/Header";
-import { Markets } from "./components/Markets";
-import { Opportunity } from "./components/Opportunity";
-import { Portfolio } from "./components/Portfolio";
-import { Activity } from "./components/Activity";
-import { Originate } from "./components/Originate";
-import { Risk } from "./components/Risk";
+import { Sidebar } from "./components/Sidebar";
+import { Markets, type Market } from "./components/Markets";
+import { Landing } from "./components/Landing";
+import { Activity, Opportunity, Portfolio } from "./components/InvestorPages";
+import { FacilityDetail, OpenFacility, OriginatorActivity, OriginatorFacilities } from "./components/OriginatorPages";
 import { NotDeployed } from "./components/NotDeployed";
 import { useDeployment } from "./hooks/useDeployment";
-import { parseHash, routeToHash, type Route } from "./lib/route";
+import { DemoProvider, facilityAsMarket, useDemo } from "./state/demo";
+
+export type Role = "investor" | "originator";
+export type Page =
+  | "home" | "markets" | "opportunity" | "portfolio" | "activity"
+  | "facilities" | "open-facility" | "facility";
+
+const PAGES: Page[] = ["home", "markets", "opportunity", "portfolio", "activity", "facilities", "open-facility", "facility"];
+
+/** Where each role lands when the switcher flips. */
+const ROLE_HOME: Record<Role, Page> = { investor: "markets", originator: "facilities" };
 
 export function App() {
+  return <DemoProvider><Shell /></DemoProvider>;
+}
+
+function Shell() {
   const deployment = useDeployment();
-  const [route, setRoute] = useState<Route>(() => parseHash(window.location.hash));
+  const { facilities, events, latestSupplyId, supply, claim, reset } = useDemo();
+  const initialPage = window.location.hash.slice(1) as Page;
+  const [page, setPage] = useState<Page>(PAGES.includes(initialPage) ? initialPage : "home");
+  const [role, setRole] = useState<Role>("investor");
   const [notice, setNotice] = useState<string | null>(null);
+  const [selectedMarket, setSelectedMarket] = useState<Market>(() => facilityAsMarket(facilities[0]));
+  // Set when the reviewed market is a live facility, so supplying writes back
+  // to the same record the originator is acting on.
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
+  // The facility the originator is managing, independent of the one the
+  // capital provider is reviewing.
+  const [manageId, setManageId] = useState<string | null>(null);
+  const managed = facilities.find((facility) => facility.id === manageId);
+  const currentMarket = selectedFacilityId
+    ? facilityAsMarket(facilities.find((facility) => facility.id === selectedFacilityId) ?? facilities[0])
+    : selectedMarket;
 
-  useEffect(() => {
-    const onHashChange = () => setRoute(parseHash(window.location.hash));
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
-
-  const navigate = (next: Route) => {
+  const navigate = (next: Page) => {
+    setPage(next);
+    window.location.hash = next;
     setNotice(null);
-    window.location.hash = routeToHash(next);
-    setRoute(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const switchRole = (next: Role) => {
+    setRole(next);
+    navigate(ROLE_HOME[next]);
+  };
+
+  // Data and view both go back to first-visit state, so nothing is left
+  // pointing at a record that no longer exists.
+  const resetDemo = () => {
+    const fresh = reset();
+    setSelectedMarket(facilityAsMarket(fresh[0]));
+    setSelectedFacilityId(null);
+    setManageId(null);
+    setRole("investor");
+    navigate(ROLE_HOME.investor);
+  };
+
+  const review = (market: Market) => {
+    setSelectedMarket(market);
+    setSelectedFacilityId(facilities.find((facility) => facility.name === market.name)?.id ?? null);
+    navigate("opportunity");
+  };
+
+  if (page === "home") return <div className="app"><Landing onExplore={() => switchRole("investor")} onMarket={(market) => { setRole("investor"); review(market); }} onOriginator={() => switchRole("originator")} /></div>;
+
   return (
-    <div className="app">
-      <Header page={route.page} onNavigate={(page) => navigate({ page } as Route)} />
-      <main className="main">
-        {!deployment ? (
-          <NotDeployed />
-        ) : (
-          <>
-            {route.page === "markets" && <Markets onReview={(facility) => navigate({ page: "opportunity", facility })} />}
-            {route.page === "opportunity" && (
-              <Opportunity
-                facility={route.facility}
-                onBack={() => navigate({ page: "markets" })}
-                onComplete={() => {
-                  navigate({ page: "portfolio" });
-                  setNotice("Capital supplied successfully.");
-                }}
-              />
-            )}
-            {route.page === "portfolio" && (
-              <Portfolio
-                notice={notice}
-                onView={(facility) => navigate({ page: "opportunity", facility })}
-                onActivity={() => navigate({ page: "activity" })}
-              />
-            )}
-            {route.page === "activity" && <Activity />}
-            {route.page === "originate" && <Originate onView={(facility) => navigate({ page: "opportunity", facility })} />}
-            {route.page === "ops" && <Risk />}
-          </>
-        )}
-      </main>
+    <div className="app shell">
+      <Sidebar role={role} page={page} onRole={switchRole} onNavigate={navigate} onHome={() => navigate("home")} />
+      <div className="shell-main">
+        <Header onReset={resetDemo} />
+        <main className="main">
+          {!deployment ? <NotDeployed /> : <>
+            {page === "markets" && <Markets onReview={review} onPortfolio={() => navigate("portfolio")} onHistory={() => navigate("activity")} />}
+            {page === "opportunity" && <Opportunity
+              market={currentMarket}
+              onBack={() => navigate("markets")}
+              onSupply={(amount) => selectedFacilityId ? supply(selectedFacilityId, amount) : false}
+              onDone={() => navigate("portfolio")}
+            />}
+            {page === "portfolio" && <Portfolio
+              notice={notice}
+              latestSupplyId={latestSupplyId}
+              live={facilities.filter((facility) => facility.supplied > 0)}
+              onClaim={(id) => { claim(id); setNotice("Principal and return claimed."); }}
+              onView={(id) => { const facility = facilities.find((item) => item.id === id); if (facility) review(facilityAsMarket(facility)); }}
+              onActivity={() => navigate("activity")}
+            />}
+            {page === "facilities" && <OriginatorFacilities
+              onOpen={() => navigate("open-facility")}
+              onManage={(id) => { setManageId(id); navigate("facility"); }}
+            />}
+            {page === "open-facility" && <OpenFacility onOpened={() => navigate("facilities")} />}
+            {page === "facility" && (managed
+              ? <FacilityDetail facility={managed} onBack={() => navigate("facilities")} />
+              : <p className="empty-state">That facility is no longer available.</p>)}
+            {page === "activity" && (role === "originator"
+              ? <OriginatorActivity events={events} />
+              : <Activity events={events.filter((event) => event.actor !== "Originator" || event.event === "Principal and fees repaid")} />)}
+          </>}
+        </main>
+      </div>
     </div>
   );
 }
