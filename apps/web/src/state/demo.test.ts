@@ -1,5 +1,13 @@
 import { expect, it } from "vitest";
-import { fundingState, facilityAsMarket, marketAction, realizedReturn, type Facility, type Stage } from "./demo";
+import { fundingState, facilityAsMarket, marketAction, randomTrancheMix, realizedReturn, type Facility, type Stage } from "./demo";
+
+it("generates a valid curator-approved tranche allocation", () => {
+  const mix = randomTrancheMix(undefined, () => 0.42);
+  expect(mix.reservePct + mix.juniorPct + mix.seniorPct).toBe(100);
+  expect(mix.reservePct).toBeGreaterThanOrEqual(15);
+  expect(mix.juniorPct).toBeGreaterThanOrEqual(16);
+  expect(mix.seniorPct).toBeGreaterThanOrEqual(45);
+});
 
 it("routes market actions by funding stage and demo position", () => {
   const facility = { limit: 1000, supplied: 400 } as Facility;
@@ -20,13 +28,14 @@ it("counts only repaid returns and settled recovery results", () => {
   expect(realizedReturn({ ...facility, stage: "recovered", recovered: 100000 })).toBe(-92000);
 });
 
-it("keeps capacity and lifecycle labels consistent across role views", () => {
-  const facility = { limit: 1000, supplied: 400, reservePct: 20 } as Facility;
+it("keeps curator-approved capacity and lifecycle labels consistent across role views", () => {
+  const facility = { limit: 1000, supplied: 400, reservePct: 20, seniorPct: 60, juniorPct: 20 } as Facility;
   for (const stage of ["open", "funded", "drawn", "repaid", "settled", "defaulted", "recovered", "closed"] as Stage[]) {
     const record = { ...facility, stage };
     const funding = fundingState(record);
     const market = facilityAsMarket(record);
-    expect(funding.available).toBe(stage === "open" || stage === "funded" ? 600 : 0);
+    expect(funding.capacity).toBe(800);
+    expect(funding.available).toBe(stage === "open" || stage === "funded" ? 400 : 0);
     expect(market.fundingLabel).toBe(funding.label);
     expect(market.accepting).toBe(funding.accepting);
     if (!funding.accepting) expect(funding.label).not.toContain("% funded");

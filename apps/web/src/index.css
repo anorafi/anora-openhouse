@@ -613,6 +613,21 @@ progress::-moz-progress-bar { background: var(--fill); border-radius: 999px; }
 .originator-layout { display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); gap: 14px; margin-top: 20px; align-items: start; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .facility-warn { margin: 12px 0 0; padding: 9px 12px; color: var(--warning); background: var(--warning-soft); border: 1px solid #f0d9a8; border-radius: 7px; font-size: 12px; }
+.tranche-template { margin: 2px 0 18px; padding: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; }
+.tranche-template header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tranche-template header div { display: grid; gap: 2px; }
+.tranche-template header small, .tranche-template header span { color: var(--muted); font-size: 10px; }
+.tranche-template header span { white-space: nowrap; }
+.tranche-bar { display: flex; height: 7px; margin: 12px 0; overflow: hidden; border-radius: 999px; background: var(--line); }
+.tranche-bar i:nth-child(1) { background: var(--ink); }
+.tranche-bar i:nth-child(2) { background: #87909d; }
+.tranche-bar i:nth-child(3) { background: var(--accent); }
+.tranche-template dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 12px; }
+.tranche-template dt { color: var(--muted); font-size: 10px; }
+.tranche-template dd { margin: 2px 0; font-size: 13px; font-weight: 700; }
+.tranche-template dl small { display: block; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.tranche-template > p { display: flex; justify-content: space-between; gap: 12px; margin: 5px 0 0; font-size: 10.5px; }
+.tranche-template > p span { color: var(--muted); }
 
 .facility-queue { display: grid; gap: 12px; align-content: start; padding: 20px 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; }
 .facility-row { position: relative; display: flex; min-width: 0; flex-direction: column; padding: 18px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; cursor: pointer; transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease; }

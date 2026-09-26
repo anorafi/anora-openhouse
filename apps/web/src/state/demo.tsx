@@ -47,6 +47,8 @@ export interface Facility {
   targetReturn: number;
   durationDays: number;
   reservePct: number;
+  seniorPct: number;
+  juniorPct: number;
   limit: number;
   firstLoss: number;
   supplied: number;
@@ -77,6 +79,8 @@ export interface NewFacility {
   route: string;
   limit: number;
   firstLoss: number;
+  seniorPct: number;
+  juniorPct: number;
   targetReturn: number;
   durationDays: number;
 }
@@ -126,7 +130,17 @@ const step = (min: number, max: number, to: number) => Math.round((min + Math.ra
 export interface FacilityDraft {
   asset: string;
   name: string; company: string; route: string; type: string; icon: string;
-  limit: string; firstLoss: string; targetReturn: string; duration: string;
+  limit: string; firstLoss: string; seniorPct: number; juniorPct: number; targetReturn: string; duration: string;
+}
+
+const oneDecimal = (value: number) => Math.round(value * 10) / 10;
+
+/** Curator-approved allocation. The remainder after reserve and Junior is Senior. */
+export function randomTrancheMix(reservePct?: number, random = Math.random) {
+  const reserve = reservePct ?? oneDecimal(15 + random() * 14);
+  const juniorMax = Math.min(30, 100 - reserve - 45);
+  const juniorPct = oneDecimal(16 + random() * (juniorMax - 16));
+  return { reservePct: reserve, juniorPct, seniorPct: oneDecimal(100 - reserve - juniorPct) };
 }
 
 /** Fresh terms for the open-facility form, avoiding names already in play. */
@@ -134,7 +148,7 @@ export function randomDraft(taken: readonly string[] = []): FacilityDraft {
   const free = FACILITY_POOL.filter((entry) => !taken.some((name) => name.startsWith(entry.name)));
   const base = pick(free.length > 0 ? free : FACILITY_POOL);
   const limit = step(150_000, 600_000, 10_000);
-  const reservePct = step(15, 30, 1);
+  const tranches = randomTrancheMix();
   return {
     asset: pick(["USDC", "USDG"]),
     name: `${base.name} ${String(step(2, 48, 1)).padStart(2, "0")}`,
@@ -143,7 +157,9 @@ export function randomDraft(taken: readonly string[] = []): FacilityDraft {
     type: base.type,
     icon: base.icon,
     limit: String(limit),
-    firstLoss: String(Math.round((limit * reservePct) / 100 / 1_000) * 1_000),
+    firstLoss: String(Math.round((limit * tranches.reservePct) / 100)),
+    seniorPct: tranches.seniorPct,
+    juniorPct: tranches.juniorPct,
     targetReturn: (step(75, 115, 1) / 10).toFixed(1),
     duration: String(pick([45, 60, 75, 90, 120])),
   };
@@ -164,7 +180,9 @@ function seed(
   stage: Stage,
   suppliedPct: number,
 ): Facility {
-  const supplied = Math.round((limit * suppliedPct) / 100);
+  const tranches = randomTrancheMix(reservePct);
+  const capacity = Math.round(limit * (tranches.seniorPct + tranches.juniorPct) / 100);
+  const supplied = Math.round((capacity * suppliedPct) / 100);
   const drawn = stage === "open" || stage === "funded" ? 0 : supplied;
   return {
     ...entry,
@@ -174,6 +192,8 @@ function seed(
     targetReturn,
     durationDays,
     reservePct,
+    seniorPct: tranches.seniorPct,
+    juniorPct: tranches.juniorPct,
     limit,
     firstLoss: Math.round((limit * reservePct) / 100),
     supplied,
@@ -432,8 +452,9 @@ const STAGE_STATUS: Record<Stage, MarketStatus> = {
 
 export function fundingState(facility: Facility) {
   const accepting = facility.stage === "open" || facility.stage === "funded";
-  const available = accepting ? Math.max(0, facility.limit - facility.supplied) : 0;
-  const percent = facility.limit > 0 ? Math.min(100, Math.round(facility.supplied / facility.limit * 100)) : 0;
+  const capacity = investableCapacity(facility);
+  const available = accepting ? Math.max(0, capacity - facility.supplied) : 0;
+  const percent = capacity > 0 ? Math.min(100, Math.round(facility.supplied / capacity * 100)) : 0;
   const label = accepting ? `${percent}% funded` : ({
     drawn: "Funding closed",
     repaid: "Repaid · ready to claim",
@@ -442,7 +463,12 @@ export function fundingState(facility: Facility) {
     recovered: "Recovery ready to claim",
     closed: "Closed at loss",
   } as Partial<Record<Stage, string>>)[facility.stage]!;
-  return { accepting, available, percent, label };
+  return { accepting, available, capacity, percent, label };
+}
+
+/** Capital-provider capacity approved by the curator, excluding first loss. */
+export function investableCapacity(facility: Pick<Facility, "limit" | "seniorPct" | "juniorPct">) {
+  return Math.round(facility.limit * (facility.seniorPct + facility.juniorPct) / 100);
 }
 
 /** Render a facility through the existing investor market components. */

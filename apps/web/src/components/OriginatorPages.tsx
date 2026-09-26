@@ -314,8 +314,12 @@ export function FacilityDetail({ facility, onBack }: { facility: Facility; onBac
         </dl>
 
         <div className="detail-section">
+          <TrancheStructure total={facility.limit} asset={facility.asset} seniorPct={facility.seniorPct} juniorPct={facility.juniorPct} reservePct={facility.reservePct} />
+        </div>
+
+        <div className="detail-section">
           <header><strong>Funding</strong><span>{fundingState(facility).label}</span></header>
-          {fundingState(facility).accepting && <progress className="accent-progress" max={facility.limit} value={facility.supplied} />}
+          {fundingState(facility).accepting && <progress className="accent-progress" max={fundingState(facility).capacity} value={facility.supplied} />}
         </div>
 
         <div className="detail-section">
@@ -382,7 +386,7 @@ export function OriginatorActivity({ events }: { events: DemoEvent[] }) {
 type OpenPhase = "clone" | "lock" | "list" | "done";
 const OPEN_ORDER: OpenPhase[] = ["clone", "lock", "list"];
 const OPEN_CTA: Record<OpenPhase, string> = {
-  clone: "Clone isolated facility",
+  clone: "Create facility",
   lock: "Lock first-loss stake",
   list: "List in Markets",
   done: "",
@@ -393,6 +397,25 @@ function LockIcon() {
     <rect x="2.7" y="6.3" width="8.6" height="6" rx="1.6" stroke="currentColor" strokeWidth="1.4" />
     <path d="M4.9 6.3V4.7a2.1 2.1 0 0 1 4.2 0v1.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
   </svg>;
+}
+
+function TrancheStructure({ total, asset, seniorPct, juniorPct, reservePct }: {
+  total: number; asset: string; seniorPct: number; juniorPct: number; reservePct: number;
+}) {
+  const layers = [
+    ["Senior", seniorPct],
+    ["Junior", juniorPct],
+    ["First-loss", reservePct],
+  ] as const;
+  return <div className="tranche-template">
+    <header><div><strong>Risk structure</strong><small>Curator-approved parameters</small></div><span>100% allocated</span></header>
+    <div className="tranche-bar" aria-label={`Senior ${seniorPct.toFixed(1)}%, Junior ${juniorPct.toFixed(1)}%, first-loss ${reservePct.toFixed(1)}%`}>
+      {layers.map(([label, percentage]) => <i key={label} title={`${label} ${percentage.toFixed(1)}%`} style={{ width: `${percentage}%` }} />)}
+    </div>
+    <dl>{layers.map(([label, percentage]) => <div key={label}><dt>{label}</dt><dd>{percentage.toFixed(1)}%</dd><small><TokenAmount value={total * percentage / 100} asset={asset} /></small></div>)}</dl>
+    <p><span>Losses</span> First-loss → Junior → Senior</p>
+    <p><span>Recoveries</span> Senior → Junior → First-loss</p>
+  </div>;
 }
 
 export function OpenFacility({ onOpened }: { onOpened: () => void }) {
@@ -412,8 +435,13 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
   const limitValue = toNumber(form.limit);
   const firstLossValue = toNumber(form.firstLoss);
   const minFirstLoss = (limitValue * MIN_FIRST_LOSS_BPS) / 10_000;
+  const reservePct = limitValue > 0 ? (firstLossValue / limitValue) * 100 : 0;
+  const investorPct = Math.max(0, 100 - reservePct);
+  const seniorPct = investorPct * (form.seniorPct / (form.seniorPct + form.juniorPct));
+  const juniorPct = Math.max(0, 100 - reservePct - seniorPct);
+  const providerCapacity = limitValue * (seniorPct + juniorPct) / 100;
   const meetsFloor = firstLossValue >= minFirstLoss && firstLossValue > 0;
-  const canOpen = form.name.trim() !== "" && form.company.trim() !== "" && limitValue > 0 && meetsFloor;
+  const canOpen = form.name.trim() !== "" && form.company.trim() !== "" && limitValue > 0 && meetsFloor && reservePct < 100;
 
   return <section className="originator-page">
     <div className="page-title"><h1>Open a facility</h1><p>Stake first-loss capital up front. It absorbs losses before any supplied position.</p></div>
@@ -450,8 +478,9 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
         </label>
         <label>Asset<select value={form.asset} onChange={(event) => set("asset")(event.target.value)}><option>USDG</option><option>USDC</option></select></label>
         <label>Credit limit<AmountInput value={form.limit} onChange={set("limit")} suffix={form.asset} /></label>
-        <label>First-loss stake<AmountInput value={form.firstLoss} onChange={set("firstLoss")} suffix="USDC" action={<button onClick={() => set("firstLoss")(String(Math.ceil(minFirstLoss)))}>Min</button>} /></label>
+        <label>First-loss stake<AmountInput value={form.firstLoss} onChange={set("firstLoss")} suffix={form.asset} action={<button onClick={() => set("firstLoss")(String(Math.ceil(minFirstLoss)))}>Min</button>} /></label>
         <p className="balance-row"><span>Protocol floor ({MIN_FIRST_LOSS_BPS / 100}%)</span><strong><TokenAmount value={minFirstLoss} asset={form.asset} /></strong></p>
+        <TrancheStructure total={limitValue} asset={form.asset} seniorPct={seniorPct} juniorPct={juniorPct} reservePct={reservePct} />
         <div className="field-pair">
           <label>Target return<div className="amount-input"><input inputMode="decimal" value={form.targetReturn} onChange={(e) => set("targetReturn")(e.target.value)} /><span>%</span></div></label>
           <label>Duration<div className="amount-input"><input inputMode="numeric" value={form.duration} onChange={(e) => set("duration")(e.target.value.replace(/\D/g, ""))} /><span>days</span></div></label>
@@ -471,6 +500,7 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
               icon: form.icon, asset: form.asset as Facility["asset"],
               name: form.name.trim(), company: form.company.trim(), route: form.route.trim(), type: form.type,
               limit: limitValue, firstLoss: firstLossValue,
+              seniorPct, juniorPct,
               targetReturn: toNumber(form.targetReturn), durationDays: toNumber(form.duration) || 90,
             });
             setPhase("done");
@@ -488,7 +518,7 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
         <div className="detail-section">
           <h2>{phase === "done" ? "Facility opened" : "Opening this facility"}</h2>
           <ol className="lifecycle">
-            <li className={stepClass(0)}><span className="lifecycle-dot" aria-hidden="true" /><div><strong>Clones an isolated facility</strong><small>Its own capital and tranches. Nothing transfers between facilities.</small></div></li>
+            <li className={stepClass(0)}><span className="lifecycle-dot" aria-hidden="true" /><div><strong>Creates an isolated facility</strong><small>Its own capital and tranches. Nothing transfers between facilities.</small></div></li>
             <li className={stepClass(1)}><span className="lifecycle-dot" aria-hidden="true" /><div><strong>Locks your first-loss stake</strong><small>{usd(firstLossValue)} absorbs losses before any supplied position.</small></div></li>
             <li className={stepClass(2)}><span className="lifecycle-dot" aria-hidden="true" /><div><strong>Lists it in Markets</strong><small>Capital providers can review terms and supply.</small></div></li>
           </ol>
@@ -499,9 +529,11 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
             <div><dt>Credit limit</dt><dd><TokenAmount value={limitValue} asset={form.asset} /></dd></div>
             <div><dt>First-loss stake</dt><dd><TokenAmount value={firstLossValue} asset={form.asset} /></dd></div>
             <div><dt>Protection reserve</dt><dd>{limitValue > 0 ? ((firstLossValue / limitValue) * 100).toFixed(1) : "0.0"}%</dd></div>
+            <div><dt>Senior capacity</dt><dd>{seniorPct.toFixed(1)}%</dd></div>
+            <div><dt>Junior capacity</dt><dd>{juniorPct.toFixed(1)}%</dd></div>
             <div><dt>Target return</dt><dd>{form.targetReturn}%</dd></div>
             <div><dt>Duration</dt><dd>{form.duration} days</dd></div>
-            <div><dt>Owed at maturity</dt><dd><TokenAmount value={limitValue * (1 + toNumber(form.targetReturn) / 100)} asset={form.asset} /></dd></div>
+            <div><dt>Owed at maturity</dt><dd><TokenAmount value={providerCapacity * (1 + toNumber(form.targetReturn) / 100)} asset={form.asset} /></dd></div>
           </dl>
         </div>
       </section>

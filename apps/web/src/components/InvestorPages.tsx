@@ -108,7 +108,7 @@ export function Opportunity({ market, onBack, onSupply, onDone }: { market: Mark
           <p className="panel-copy">Provide capital to earn a {market.targetReturn} target return.</p>
           <label>Asset<select><option>{market.asset}</option></select></label>
           <p className="balance-row"><span>Wallet balance</span><strong><TokenAmount value={250000} asset={market.asset} /></strong></p>
-          <label>Amount<AmountInput value={amount} onChange={setAmount} suffix={market.asset} action={<button onClick={() => setAmount("250000")}>Max</button>} /></label>
+          <label>Amount<AmountInput value={amount} onChange={setAmount} suffix={market.asset} action={<button onClick={() => setAmount(String(Math.min(250000, availableValue)))}>Max</button>} /></label>
           <dl className="supply-totals"><div><dt>Estimated repayment</dt><dd><TokenAmount value={repayment} asset={market.asset} /></dd></div><div><dt>Estimated return</dt><dd><TokenAmount value={Math.max(0, repayment - value)} asset={market.asset} /></dd></div></dl>
           <button className="accent-button wide" disabled={!validAmount} onClick={() => setPhase("approve")}>Review supply</button>
           <div className="eligibility"><strong>Available to your account</strong><span>Fits your institutional mandate.</span></div>
