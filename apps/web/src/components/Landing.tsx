@@ -40,10 +40,10 @@ export function Landing({ onExplore, onMarket, onOriginator }: { onExplore: () =
     <div className="landing-card">
       <div className="landing-intro">
         <span className="landing-brand">Anora</span>
-        <h1>Credit rails for global trade.</h1>
+        <h1>Onchain rails for global trade.</h1>
         <p>
-          Anora provides <strong className="yield-highlight">trade-backed yield</strong> by routing capital to trade-finance originators through
-          programmable credit pools.
+          Anora connects onchain capital to vetted trade-credit opportunities, providing <strong className="yield-highlight">trade-backed yield
+          uncorrelated with crypto markets</strong>.
         </p>
         <div className="landing-actions">
           <button className="landing-primary" onClick={onExplore}>Explore markets</button>
