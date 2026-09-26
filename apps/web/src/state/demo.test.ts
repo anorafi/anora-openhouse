@@ -10,9 +10,9 @@ it("generates a valid curator-approved tranche allocation", () => {
 });
 
 it("routes market actions by funding stage and demo position", () => {
-  const facility = { limit: 1000, supplied: 400 } as Facility;
+  const facility = { limit: 1000, supplied: 400, seniorPct: 60, juniorPct: 20 } as Facility;
   expect(marketAction({ ...facility, stage: "open" })).toBe("View market");
-  expect(marketAction({ ...facility, stage: "funded", supplied: 1000 })).toBe("View position");
+  expect(marketAction({ ...facility, stage: "funded", supplied: 800 })).toBe("View position");
   expect(marketAction({ ...facility, stage: "drawn" })).toBe("View position");
   for (const stage of ["repaid", "recovered"] as Stage[]) expect(marketAction({ ...facility, stage })).toBe("Claim funds");
   for (const stage of ["settled", "closed"] as Stage[]) expect(marketAction({ ...facility, stage })).toBe("View history");
