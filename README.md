@@ -2,39 +2,42 @@
 
 **Bringing trade-backed yield onchain, uncorrelated with crypto markets.**
 
-Created by **0xpg**
-
 [Live demo](https://openhouse.anora.finance)
 
 Anora is a PayFi (Payment Finance) protocol for isolated trade-credit
-facilities. Capital providers choose individual opportunities and review the
-terms, underwriting, tranche structure, originator first-loss protection, and
-repayment lifecycle before supplying capital. Approved originators create
-facilities, commit first-loss capital, draw liquidity, and repay principal and
-financing fees. Each facility keeps its capital, risk, and outcome separate.
+facilities.
+
+Anora builds onchain rails connecting global capital with the real economy.
+Through isolated, programmable vaults, Anora connects capital to vetted
+trade-credit opportunities and provides transparent access to yield generated
+by real commercial activity. Each facility has its own terms, tranche
+structure, originator first-loss reserve, and repayment lifecycle — keeping
+risk contained within that facility.
 
 ## Pooled PayFi model vs Anora
 
 Some PayFi products aggregate multiple credit opportunities into one managed
 portfolio. Anora gives capital providers direct, facility-level choice.
 
-```mermaid
-flowchart LR
-    subgraph pooled["Pooled PayFi model"]
-        pooled_providers["Capital providers"] --> shared_vault["Shared vault"]
-        shared_vault --> pooled_a["Trade facility A"]
-        shared_vault --> pooled_b["Trade facility B"]
-        shared_vault --> pooled_c["Trade facility C"]
-    end
+```text
+Pooled PayFi model                         Anora
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    subgraph anora["Anora isolated facilities"]
-        provider["Capital provider"] -->|chooses| facility_a["Facility A"]
-        provider -->|chooses| facility_b["Facility B"]
-        provider -->|chooses| facility_c["Facility C"]
-        facility_a --> originator_a["Originator and trade A"]
-        facility_b --> originator_b["Originator and trade B"]
-        facility_c --> originator_c["Originator and trade C"]
-    end
+Capital providers                          Capital provider
+[Provider]  [Provider]                     [Provider]
+     │          │                               │
+     └────┬─────┘                               │ chooses
+          │                              ┌───────┼────────┐
+     ┌────▼────┐                         │       │        │
+     │ Shared  │                     ┌───▼───┐ ┌─▼─────┐ ┌▼──────┐
+     │ PayFi   │                     │Facility│ │Facility│ │Facility│
+     │ vault   │                     │   A    │ │   B    │ │   C   │
+     │  ($$)   │                     │  ($$)  │ │  ($$)  │ │  ($$) │
+     └────┬────┘                     └───┬────┘ └──┬────┘ └──┬────┘
+          │                              │         │          │
+   ┌──────┼──────┐                  [Originator] [Originator] [Originator]
+   │      │      │                       │          │          │
+[Trade A][Trade B][Trade C]           [Trade A]  [Trade B]  [Trade C]
 ```
 
 | Pooled PayFi model | Anora |
@@ -50,37 +53,31 @@ flowchart LR
   <tr>
     <td width="50%">
       <img src="docs/readme-assets/02-capital-provider-markets.png" alt="Anora markets screen"><br>
-      <strong>Choose the facility</strong><br>
-      Compare trade corridors, returns, duration, available capacity, and first-loss protection.
+      <strong>Explore isolated trade-credit opportunities</strong>
     </td>
     <td width="50%">
       <img src="docs/readme-assets/03-facility-detail.png" alt="Anora facility detail screen"><br>
-      <strong>Review before supplying</strong><br>
-      See facility terms, funding progress, tranche capacity, and estimated repayment together.
+      <strong>Review every facility before funding</strong>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <img src="docs/readme-assets/04-risk-and-underwriting.png" alt="Anora risk and underwriting screen"><br>
-      <strong>Inspect risk and underwriting</strong><br>
-      Review operating history, trade assets, buyer concentration, documents, and the protection structure.
+      <strong>See risk, underwriting, and protection</strong>
     </td>
     <td width="50%">
       <img src="docs/readme-assets/05-capital-provider-portfolio.png" alt="Anora capital-provider portfolio"><br>
-      <strong>Track every position</strong><br>
-      Follow supplied capital, allocation, repayment dates, and projected portfolio value from shared facility data.
+      <strong>Track positions and repayment outlook</strong>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <img src="docs/readme-assets/06-originator-facilities.png" alt="Anora originator workspace"><br>
-      <strong>Operate facilities independently</strong><br>
-      Originators manage funding, drawdown, repayment, default, and recovery for each facility.
+      <strong>Manage every facility independently</strong>
     </td>
     <td width="50%">
       <img src="docs/readme-assets/07-open-facility.png" alt="Anora open facility screen"><br>
-      <strong>Create the risk structure first</strong><br>
-      Define the trade, credit terms, tranche proportions, and first-loss stake before listing the facility.
+      <strong>Create programmable trade-credit facilities</strong>
     </td>
   </tr>
 </table>
