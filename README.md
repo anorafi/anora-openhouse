@@ -1,12 +1,89 @@
-# Anora Open House
+# Anora
 
-Isolated onchain credit facilities for curated originators. Each facility is
-its own vault (a minimal clone opened through `AnoraFactory`) with Senior and
-Junior tranches; the originator stakes first-loss capital, draws liquidity,
-and repays with a financing fee. A default in one facility never touches
-another. Late payments pause drawdown automatically. Default is declared by a risk
-agent with the reason recorded onchain, first-loss capital absorbs the loss
-first, and recoveries flow back through the waterfall, Senior first.
+**Bringing trade-backed yield onchain, uncorrelated with crypto markets.**
+
+Created by **0xpg**
+
+[Live demo](https://openhouse.anora.finance)
+
+Anora is a PayFi (Payment Finance) protocol for isolated trade-credit
+facilities. Capital providers choose individual opportunities and review the
+terms, underwriting, tranche structure, originator first-loss protection, and
+repayment lifecycle before supplying capital. Approved originators create
+facilities, commit first-loss capital, draw liquidity, and repay principal and
+financing fees. Each facility keeps its capital, risk, and outcome separate.
+
+## Pooled PayFi model vs Anora
+
+Some PayFi products aggregate multiple credit opportunities into one managed
+portfolio. Anora gives capital providers direct, facility-level choice.
+
+```mermaid
+flowchart LR
+    subgraph pooled["Pooled PayFi model"]
+        pooled_providers["Capital providers"] --> shared_vault["Shared vault"]
+        shared_vault --> pooled_a["Trade facility A"]
+        shared_vault --> pooled_b["Trade facility B"]
+        shared_vault --> pooled_c["Trade facility C"]
+    end
+
+    subgraph anora["Anora isolated facilities"]
+        provider["Capital provider"] -->|chooses| facility_a["Facility A"]
+        provider -->|chooses| facility_b["Facility B"]
+        provider -->|chooses| facility_c["Facility C"]
+        facility_a --> originator_a["Originator and trade A"]
+        facility_b --> originator_b["Originator and trade B"]
+        facility_c --> originator_c["Originator and trade C"]
+    end
+```
+
+| Pooled PayFi model | Anora |
+|---|---|
+| Capital is allocated across a managed portfolio. | Capital providers choose individual facilities. |
+| Facility performance is blended into one portfolio value. | Each facility has its own capital, terms, and outcome. |
+| Providers inherit the portfolio's combined exposure. | Providers review facility-specific risk before supplying. |
+| Protection depends on the pooled vehicle's structure. | Each facility has Senior and Junior tranches plus an originator first-loss reserve. |
+
+## Product features
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/readme-assets/02-capital-provider-markets.png" alt="Anora markets screen"><br>
+      <strong>Choose the facility</strong><br>
+      Compare trade corridors, returns, duration, available capacity, and first-loss protection.
+    </td>
+    <td width="50%">
+      <img src="docs/readme-assets/03-facility-detail.png" alt="Anora facility detail screen"><br>
+      <strong>Review before supplying</strong><br>
+      See facility terms, funding progress, tranche capacity, and estimated repayment together.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/readme-assets/04-risk-and-underwriting.png" alt="Anora risk and underwriting screen"><br>
+      <strong>Inspect risk and underwriting</strong><br>
+      Review operating history, trade assets, buyer concentration, documents, and the protection structure.
+    </td>
+    <td width="50%">
+      <img src="docs/readme-assets/05-capital-provider-portfolio.png" alt="Anora capital-provider portfolio"><br>
+      <strong>Track every position</strong><br>
+      Follow supplied capital, allocation, repayment dates, and projected portfolio value from shared facility data.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/readme-assets/06-originator-facilities.png" alt="Anora originator workspace"><br>
+      <strong>Operate facilities independently</strong><br>
+      Originators manage funding, drawdown, repayment, default, and recovery for each facility.
+    </td>
+    <td width="50%">
+      <img src="docs/readme-assets/07-open-facility.png" alt="Anora open facility screen"><br>
+      <strong>Create the risk structure first</strong><br>
+      Define the trade, credit terms, tranche proportions, and first-loss stake before listing the facility.
+    </td>
+  </tr>
+</table>
 
 Built for the Arbitrum Open House Singapore 2026 buildathon. Target chain:
 Arbitrum Sepolia.
@@ -40,10 +117,12 @@ bun run test:contracts
 
 Live demo build: https://openhouse.anora.finance (redeploy with `bin/deploy-web.sh`).
 
-Vite + React + TypeScript + wagmi v2 + viem, talking directly to `AnoraFactory`
-and each `AnoraFacility` clone (plus the pool asset) through an injected
-wallet (MetaMask). Plain CSS, no UI framework. Single-page app with hash
-routing (`src/lib/route.ts`); no server-side state.
+Vite + React + TypeScript with plain CSS and no UI framework. The latest
+routed capital-provider and originator experience is the approved product
+demo and currently runs through `DemoProvider` in `apps/web/src/App.tsx`.
+Wallet configuration, deployment resolution, wagmi/viem hooks, and older live
+contract components remain in the repository for integration, but they are
+not yet the data source behind the latest screens.
 
 ```
 bun run dev:web      # http://127.0.0.1:5173
@@ -64,18 +143,18 @@ reads `riskAgent()` back from its factory rather than storing its own.
 
 | Route | Page | What it does |
 |---|---|---|
-| `#markets` | Markets | `factory.allFacilities()`, one live card per facility (status, limit, capital/cap, first-loss %, Senior capacity, tenor/grace, financing fee, evidence). |
-| `#opportunity/<facility>` | Opportunity | Facility detail plus the supply panel (approve → `deposit(tranche, amount)`) and the withdraw panel (`withdraw(tranche, shares)`). |
-| `#portfolio` | Portfolio | My Senior/Junior shares across every facility, valued live pro rata against each tranche's assets; no fabricated chart. |
-| `#activity` | Activity | `getLogs` over the last ~50,000 blocks across every facility, filtered to events where the connected wallet is the provider or the originator. |
-| `#originate` | Originate | Form to `createFacility` (approve first-loss stake to the factory first) plus a live list of facilities I originated, each with drawdown, repay, and evidence-hash attachment. |
-| `#risk` | Risk | Every facility with due/late/grace countdowns; mark late (anyone, past due), declare default (risk agent only, reason required, after grace), record recovery (after default). |
+| `#home` | Homepage | Explains the product and routes users into capital-provider or originator workflows. |
+| `#markets` | Markets | Compares isolated facilities using synchronized demo terms, capacity, protection, and status. |
+| `#opportunity` | Facility detail | Reviews a selected facility, its underwriting and documents, then simulates approval and supply. |
+| `#portfolio` | Portfolio | Derives supplied positions, allocation, repayment dates, and projections from the same demo facility records. |
+| `#activity` | Activity | Presents role-aware lifecycle events generated by demo interactions. |
+| `#facilities` | Originator facilities | Lists facilities managed by the approved originator and exposes lifecycle-specific actions. |
+| `#open-facility` | Open a facility | Creates editable terms, tranche proportions, provider capacity, and first-loss reserve in demo state. |
+| `#facility` | Facility management | Operates drawdown, repayment, default, and recovery against the selected demo facility. |
 
-Every number on every page is a live contract read (`useFacilities`,
-`useFactory`, `useAsset`, `usePositions`, refetched every ~5s and after each
-transaction); every button sends a real transaction through
-`useContractAction` (`writeContract` + `useWaitForTransactionReceipt`), there
-is no mock data left in `src/components`.
+The production integration must replace `DemoProvider` behind these screens
+with canonical contract reads, transactions, indexing, and approved metadata.
+It must not silently fall back to demo data when a live integration fails.
 
 ### Supported networks
 
