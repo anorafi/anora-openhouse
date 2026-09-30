@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FacilityData } from "../hooks/useFacilities";
-import { durationText, fromUnits, stageOf, toFacility, toUnits, waterfallOf } from "./book";
+import { durationText, fromUnits, fundingState, marketAction, realizedReturn, stageOf, toFacility, toUnits, waterfallOf, type Facility } from "./book";
 import { encodeFacilityName } from "./facilityName";
 
 const U = 1_000_000n;
@@ -127,5 +127,54 @@ describe("waterfallOf", () => {
   it("previews a payment senior first, then first-loss back to the originator", () => {
     const facility = toFacility(defaulted, { seniorShares: 9n * U, juniorShares: 0n }, { drawn: 9, repaid: 0, recovered: 0, defaultLoss: 9 });
     expect(waterfallOf(facility, 4)).toMatchObject({ recovered: 4, shortfall: 5, supplierLoss: 0, reserveApplied: 5 });
+  });
+});
+
+describe("provider view of a facility", () => {
+  const open = toFacility(data(), { seniorShares: 0n, juniorShares: 0n });
+
+  it("labels the asset and treats every provider dollar as senior, since junior is not sold", () => {
+    expect(toFacility(data(), { seniorShares: 0n, juniorShares: 0n }, undefined, "USDG").asset).toBe("USDG");
+    expect(open.asset).toBe("USDC");
+    expect(open.juniorPct).toBe(0);
+    expect(open.seniorPct).toBe(70);
+  });
+
+  it("measures funding against what the contract still accepts", () => {
+    expect(fundingState(open)).toMatchObject({ accepting: true, available: 13.5, percent: 0, label: "0% funded" });
+    const half = { ...open, supplied: 6.75, available: 6.75 };
+    expect(fundingState(half)).toMatchObject({ accepting: true, percent: 50, label: "50% funded" });
+  });
+
+  it("closes funding once the facility draws and says why", () => {
+    const labels: Array<[Facility["stage"], string]> = [
+      ["drawn", "Funding closed"],
+      ["late", "Past due"],
+      ["repaid", "Repaid · ready to claim"],
+      ["settled", "Settled · complete"],
+      ["defaulted", "In default"],
+      ["recovered", "Recovery ready to claim"],
+      ["closed", "Closed at loss"],
+    ];
+    for (const [stage, label] of labels) {
+      const state = fundingState({ ...open, stage, supplied: 9, available: 0 });
+      expect(state).toMatchObject({ accepting: false, available: 0, label });
+    }
+  });
+
+  it("routes the market button by stage and by whether the wallet holds anything", () => {
+    expect(marketAction(open)).toBe("View market");
+    expect(marketAction({ ...open, stage: "drawn", available: 0 })).toBe("Funding closed");
+    expect(marketAction({ ...open, stage: "drawn", available: 0, holding: { ...open.holding, value: 3 } })).toBe("View position");
+    for (const stage of ["repaid", "recovered"] as const) expect(marketAction({ ...open, stage, available: 0, holding: { ...open.holding, value: 3 } })).toBe("Claim funds");
+    for (const stage of ["settled", "closed"] as const) expect(marketAction({ ...open, stage, available: 0, holding: { ...open.holding, value: 0, supplied: 3 } })).toBe("View history");
+  });
+
+  it("counts a return only once the facility has paid out", () => {
+    const held = { ...open, holding: { ...open.holding, value: 3.09, supplied: 3 } };
+    expect(realizedReturn({ ...held, stage: "drawn" })).toBe(0);
+    expect(realizedReturn({ ...held, stage: "defaulted" })).toBe(0);
+    expect(realizedReturn({ ...held, stage: "repaid" })).toBeCloseTo(0.09);
+    expect(realizedReturn({ ...held, stage: "recovered", holding: { ...held.holding, value: 1 } })).toBe(-2);
   });
 });

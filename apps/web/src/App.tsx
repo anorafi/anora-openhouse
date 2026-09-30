@@ -27,7 +27,7 @@ export function App() {
 
 function Shell() {
   const deployment = useDeployment();
-  const { facilities, events, symbol, me, approve, supply, claim } = useBook();
+  const { facilities, events, symbol, me, latestSupplyId, approve, supply, claim } = useBook();
   const initialPage = window.location.hash.slice(1) as Page;
   const [page, setPage] = useState<Page>(PAGES.includes(initialPage) ? initialPage : "home");
   const [role, setRole] = useState<Role>("investor");
@@ -61,7 +61,7 @@ function Shell() {
     navigate("opportunity");
   };
 
-  if (page === "home") return <div className="app"><Landing onNavigate={navigate} /></div>;
+  if (page === "home") return <div className="app"><Landing onExplore={() => switchRole("investor")} onMarket={(market) => { setRole("investor"); review(market); }} onOriginator={() => switchRole("originator")} /></div>;
 
   return (
     <div className="app shell">
@@ -70,7 +70,7 @@ function Shell() {
         <Header />
         <main className="main">
           {!deployment ? <NotDeployed /> : <>
-            {page === "markets" && <Markets onReview={review} />}
+            {page === "markets" && <Markets onReview={review} onPortfolio={() => navigate("portfolio")} onHistory={() => navigate("activity")} />}
             {page === "opportunity" && (selected
               ? <Opportunity
                 key={selected.id}
@@ -78,11 +78,12 @@ function Shell() {
                 onBack={() => navigate("markets")}
                 onApprove={(amount) => approve(selected.id, amount)}
                 onSupply={(amount) => supply(selected.id, amount)}
-                onDone={() => { navigate("portfolio"); setNotice("Capital supplied successfully."); }}
+                onDone={() => navigate("portfolio")}
               />
               : <p className="empty-state">Choose a facility from Markets.</p>)}
             {page === "portfolio" && <Portfolio
               notice={notice}
+              latestSupplyId={latestSupplyId}
               live={facilities.filter((facility) => facility.holding.value > 0)}
               onClaim={async (id) => { await claim(id); setNotice("Principal and return claimed."); }}
               onView={(id) => { const facility = facilities.find((item) => item.id === id); if (facility) review(facilityAsMarket(facility, symbol)); }}

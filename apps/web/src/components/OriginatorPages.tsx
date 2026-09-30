@@ -1,12 +1,14 @@
-import { useMemo, useState } from "react";
+import { TokenAmount } from "./TokenAmount";
+import { useMemo, useState, type CSSProperties } from "react";
 import { AmountInput } from "./AmountInput";
 import { FilterBar, presentOptions } from "./FilterBar";
 import { useTx } from "../hooks/useTx";
-import { DEFAULT_STAGES, ORIGINATOR_ACTION, STAGE_LABEL, eventTime, isMine, owedOn, waterfallOf, randomDraft, useBook, useDraftSize, useMoney, type BookEvent, type Facility, type Stage } from "../state/book";
+import { fundingState, DEFAULT_STAGES, ORIGINATOR_ACTION, STAGE_LABEL, eventTime, isMine, owedOn, waterfallOf, randomDraft, useBook, useDraftSize, useMoney, type BookEvent, type Facility, type Stage } from "../state/book";
 
 /** Protocol-level floor, mirroring minFirstLossBps on the factory. */
 const MIN_FIRST_LOSS_BPS = 1_000;
 
+const amountIn = (asset: string) => (value: number) => `${value.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${asset}`;
 const toNumber = (value: string) => Number(value.replace(/[^0-9.]/g, "")) || 0;
 
 const LIFECYCLE: Array<{ stage: Stage; label: string; by: string }> = [
@@ -18,6 +20,9 @@ const LIFECYCLE: Array<{ stage: Stage; label: string; by: string }> = [
 
 const ORDER: Stage[] = ["open", "funded", "drawn", "repaid"];
 
+/** Past due sits on the drawn step until it is repaid or defaults. */
+const STEP_OF: Partial<Record<Stage, Stage>> = { late: "drawn" };
+
 /** The exceptional path. No role acts it out; the protocol records it. */
 const DEFAULT_LIFECYCLE: Array<{ label: string; by: string }> = [
   { label: "Opened and staked", by: "Originator" },
@@ -27,9 +32,6 @@ const DEFAULT_LIFECYCLE: Array<{ label: string; by: string }> = [
   { label: "Default declared after grace", by: "Risk agent" },
   { label: "Recoveries remitted in full", by: "Originator" },
 ];
-/** Past due sits on the drawn step until it is repaid or defaults. */
-const STEP_OF: Partial<Record<Stage, Stage>> = { late: "drawn" };
-
 /** How far along the default path each stage sits. */
 const DEFAULT_INDEX: Record<string, number> = { defaulted: 5, recovered: 6, closed: 6 };
 
@@ -60,8 +62,8 @@ const DURATIONS: Array<{ label: string; holds: (facility: Facility) => boolean }
 ];
 
 export function OriginatorFacilities({ onManage, onOpen }: { onManage: (id: string) => void; onOpen: () => void }) {
-  const { facilities: book, me } = useBook();
-  const usd = useMoney();
+  const { facilities: book, me, symbol } = useBook();
+  const usd = amountIn(symbol);
   const facilities = useMemo(() => book.filter((facility) => isMine(facility, me)), [book, me]);
   const [query, setQuery] = useState("");
   const [type, setType] = useState("All");
@@ -130,28 +132,36 @@ export function OriginatorFacilities({ onManage, onOpen }: { onManage: (id: stri
 }
 
 function FacilityListRow({ facility, onManage }: { facility: Facility; onManage: () => void }) {
+  const usd = amountIn(facility.asset);
   const action = ORIGINATOR_ACTION[facility.stage];
-  const amount = (value: number) => Math.round(value).toLocaleString();
+  const ratio = (value: number) => facility.limit > 0 ? Math.round((value / facility.limit) * 100) : 0;
+  const RatioCell = ({ value, kind }: { value: number; kind: "supplied" | "owed" | "reserve" }) => {
+    const percentage = ratio(value);
+    if (kind === "owed") return <div className={`list-ratio list-ratio-owed ${percentage > 100 ? "over" : ""}`} title={usd(value)} aria-label={`${usd(value)}, ${percentage}% of credit limit`}><strong><TokenAmount value={value} asset={facility.asset} /></strong><progress max="100" value={Math.min(100, Math.max(0, percentage))}>{percentage}%</progress></div>;
+    if (kind === "reserve") return <div className="list-ratio list-ratio-reserve" title={usd(value)} aria-label={`${percentage}% reserve, ${usd(value)}`}><strong>{percentage}%</strong><span className="reserve-mark" style={{ "--reserve": `${Math.min(100, Math.max(0, percentage))}%` } as CSSProperties} /></div>;
+    return <div className="list-ratio list-ratio-supplied" title={usd(value)} aria-label={`${percentage}% supplied, ${usd(value)}`}><strong>{percentage}%</strong><progress max="100" value={Math.min(100, Math.max(0, percentage))}>{percentage}%</progress></div>;
+  };
   return <article className={`facility-list-row status-${facility.stage}`}>
     <div className="list-name"><strong>{facility.name}</strong><span className={`market-status ${facility.stage}`}><i />{STAGE_LABEL[facility.stage]}</span></div>
-    <span>{facility.type}</span><span>{facility.route}</span><span>{facility.company}</span><strong>{amount(facility.limit)}</strong><strong>{amount(facility.supplied)}</strong><strong>{amount(lastValue(facility))}</strong><strong>{amount(facility.firstLoss)}</strong>
+    <span>{facility.type} · {facility.asset}</span><span>{facility.route}</span><span>{facility.company}</span><strong><TokenAmount value={facility.limit} asset={facility.asset} /></strong><RatioCell value={facility.supplied} kind="supplied" /><RatioCell value={lastValue(facility)} kind="owed" /><RatioCell value={facility.firstLoss} kind="reserve" />
     <button className={action ? "list-action primary" : "list-action"} onClick={onManage}>{action ?? "Manage"}</button>
   </article>;
 }
 
 /** The fourth figure tracks whatever matters most at this stage. */
 function lastLabel(facility: Facility) {
+  if (facility.stage === "repaid" || facility.stage === "settled") return "Repaid";
   if (facility.recovered > 0) return "Recovered";
   return facility.stage === "drawn" || facility.stage === "late" || facility.stage === "defaulted" ? "Owed" : "Drawn";
 }
 function lastValue(facility: Facility) {
+  if (facility.stage === "repaid" || facility.stage === "settled") return facility.repaid;
   if (facility.recovered > 0) return facility.recovered;
   if (facility.stage === "defaulted") return waterfallOf(facility).shortfall;
   return facility.stage === "drawn" || facility.stage === "late" ? owedOn(facility) : facility.drawn;
 }
 
 function FacilityCard({ facility, onManage }: { facility: Facility; onManage: () => void }) {
-  const usd = useMoney();
   const action = ORIGINATOR_ACTION[facility.stage];
   return <article
     className={`facility-row status-${facility.stage}`}
@@ -168,10 +178,10 @@ function FacilityCard({ facility, onManage }: { facility: Facility; onManage: ()
       <p className="market-company"><span aria-hidden="true">{facility.icon}</span>{facility.company}</p>
     </div>
     <dl className="facility-figures">
-      <div><dt>Credit limit</dt><dd>{usd(facility.limit)}</dd></div>
-      <div><dt>First-loss</dt><dd>{usd(facility.firstLoss)}</dd></div>
-      <div><dt>Supplied</dt><dd>{usd(facility.supplied)}</dd></div>
-      <div><dt>{lastLabel(facility)}</dt><dd>{usd(lastValue(facility))}</dd></div>
+      <div><dt>Credit limit</dt><dd><TokenAmount value={facility.limit} asset={facility.asset} /></dd></div>
+      <div><dt>First-loss</dt><dd><TokenAmount value={facility.firstLoss} asset={facility.asset} /></dd></div>
+      <div><dt>Total supplied</dt><dd><TokenAmount value={facility.supplied} asset={facility.asset} /></dd></div>
+      <div><dt>{lastLabel(facility)}</dt><dd><TokenAmount value={lastValue(facility)} asset={facility.asset} /></dd></div>
     </dl>
     <footer>
       <button className={action ? "accent-button" : "secondary-button"} onClick={(event) => { event.stopPropagation(); onManage(); }}>{action ?? "Manage"}</button>
@@ -182,8 +192,8 @@ function FacilityCard({ facility, onManage }: { facility: Facility; onManage: ()
 /* ---- Facility detail ---------------------------------------------------- */
 
 export function FacilityDetail({ facility, onBack }: { facility: Facility; onBack: () => void }) {
+  const usd = amountIn(facility.asset);
   const { draw, repay, recover } = useBook();
-  const usd = useMoney();
   const tx = useTx();
   const [reviewing, setReviewing] = useState(false);
   const outstanding = waterfallOf(facility).shortfall;
@@ -224,13 +234,13 @@ export function FacilityDetail({ facility, onBack }: { facility: Facility; onBac
           <h2>Remit recoveries</h2>
           <p className="panel-copy">Pay in what you have collected. Remit again as more comes in, until the balance is cleared.</p>
           <div className="detail-section">
-            <header><strong>Collected</strong><span>{usd(facility.recovered)} of {usd(flow.owed)}</span></header>
+            <header><strong>Collected</strong><span><TokenAmount value={facility.recovered} asset={facility.asset} /> of <TokenAmount value={flow.owed} asset={facility.asset} /></span></header>
             <progress className="accent-progress" max={Math.round(flow.owed)} value={Math.round(facility.recovered)} />
           </div>
-          <label>This payment<AmountInput value={recovery} onChange={setRecovery} suffix="USDC" action={<button onClick={() => setRecovery(String(Math.round(outstanding)))}>Rest</button>} /></label>
+          <label>This payment<AmountInput value={recovery} onChange={setRecovery} suffix={facility.asset} action={<button onClick={() => setRecovery(String(Math.round(outstanding)))}>Rest</button>} /></label>
           <dl className="supply-totals">
-            <div><dt>Still outstanding</dt><dd>{usd(outstanding)}</dd></div>
-            <div><dt>After this payment</dt><dd className={flow.shortfall > 0 ? "negative" : "positive"}>{usd(flow.shortfall)}</dd></div>
+            <div><dt>Still outstanding</dt><dd><TokenAmount value={outstanding} asset={facility.asset} /></dd></div>
+            <div><dt>After this payment</dt><dd className={flow.shortfall > 0 ? "negative" : "positive"}><TokenAmount value={flow.shortfall} asset={facility.asset} /></dd></div>
           </dl>
           <button className="accent-button wide" disabled={payment <= 0} onClick={() => setReviewing(true)}>Review</button>
           <small>{clearsBalance
@@ -244,12 +254,12 @@ export function FacilityDetail({ facility, onBack }: { facility: Facility; onBac
             ? "This covers the balance in full, so the capital provider can claim principal and return."
             : "This payment is recorded against the facility. Remit again as more is collected."}</p>
           <dl className="review-list">
-            <div><dt>Owed at maturity</dt><dd>{usd(flow.owed)}</dd></div>
-            <div><dt>Already collected</dt><dd>{usd(facility.recovered)}</dd></div>
-            <div><dt>This payment</dt><dd>{usd(payment)}</dd></div>
-            <div><dt>Collected after this</dt><dd>{usd(flow.recovered)}</dd></div>
-            <div><dt>Still outstanding</dt><dd className={flow.shortfall > 0 ? "negative" : "positive"}>{usd(flow.shortfall)}</dd></div>
-            <div><dt>First-loss cover</dt><dd>{usd(facility.firstLoss)}</dd></div>
+            <div><dt>Owed at maturity</dt><dd><TokenAmount value={flow.owed} asset={facility.asset} /></dd></div>
+            <div><dt>Already collected</dt><dd><TokenAmount value={facility.recovered} asset={facility.asset} /></dd></div>
+            <div><dt>This payment</dt><dd><TokenAmount value={payment} asset={facility.asset} /></dd></div>
+            <div><dt>Collected after this</dt><dd><TokenAmount value={flow.recovered} asset={facility.asset} /></dd></div>
+            <div><dt>Still outstanding</dt><dd className={flow.shortfall > 0 ? "negative" : "positive"}><TokenAmount value={flow.shortfall} asset={facility.asset} /></dd></div>
+            <div><dt>First-loss cover</dt><dd><TokenAmount value={facility.firstLoss} asset={facility.asset} /></dd></div>
           </dl>
           <div className="review-actions">
             <button className="secondary-button" onClick={() => setReviewing(false)}>Back</button>
@@ -265,10 +275,10 @@ export function FacilityDetail({ facility, onBack }: { facility: Facility; onBac
           <h2>Balance cleared</h2>
           <p className="panel-copy">{hintFor(facility.stage)}</p>
           <dl className="review-list">
-            <div><dt>Owed at maturity</dt><dd>{usd(flow.owed)}</dd></div>
-            <div><dt>Recovered</dt><dd>{usd(flow.recovered)}</dd></div>
-            <div><dt>Still outstanding</dt><dd className={flow.shortfall > 0 ? "negative" : "positive"}>{usd(flow.shortfall)}</dd></div>
-            <div><dt>Held for capital providers</dt><dd>{usd(facility.supplied)}</dd></div>
+            <div><dt>Owed at maturity</dt><dd><TokenAmount value={flow.owed} asset={facility.asset} /></dd></div>
+            <div><dt>Recovered</dt><dd><TokenAmount value={flow.recovered} asset={facility.asset} /></dd></div>
+            <div><dt>Still outstanding</dt><dd className={flow.shortfall > 0 ? "negative" : "positive"}><TokenAmount value={flow.shortfall} asset={facility.asset} /></dd></div>
+            <div><dt>Held for capital providers</dt><dd><TokenAmount value={facility.supplied} asset={facility.asset} /></dd></div>
             <div><dt>First-loss drawn</dt><dd>{flow.reserveApplied.toLocaleString("en-US", { maximumFractionDigits: 2 })} / {usd(facility.firstLoss)}</dd></div>
           </dl>
           <small>You cleared the balance, so your first-loss stake was never drawn.</small>
@@ -281,8 +291,8 @@ export function FacilityDetail({ facility, onBack }: { facility: Facility; onBac
             : `Repay principal plus the ${facility.feePct}% financing fee.`}</p>
           <dl className="supply-totals">
             {facility.stage === "funded"
-              ? <><div><dt>Available to draw</dt><dd>{usd(drawable)}</dd></div><div><dt>Credit limit</dt><dd>{usd(facility.limit)}</dd></div></>
-              : <><div><dt>Principal drawn</dt><dd>{usd(facility.drawn)}</dd></div><div><dt>Financing fee</dt><dd>{usd(owed - facility.drawn)}</dd></div></>}
+              ? <><div><dt>Available to draw</dt><dd><TokenAmount value={drawable} asset={facility.asset} /></dd></div><div><dt>Credit limit</dt><dd><TokenAmount value={facility.limit} asset={facility.asset} /></dd></div></>
+              : <><div><dt>Principal drawn</dt><dd><TokenAmount value={facility.drawn} asset={facility.asset} /></dd></div><div><dt>Financing fee</dt><dd><TokenAmount value={owed - facility.drawn} asset={facility.asset} /></dd></div></>}
           </dl>
           <button className="accent-button wide" onClick={() => setReviewing(true)}>Review {facility.stage === "funded" ? "drawdown" : "repayment"}</button>
           <small>You will confirm each transaction in your wallet.</small>
@@ -294,9 +304,9 @@ export function FacilityDetail({ facility, onBack }: { facility: Facility; onBac
           <dl className="review-list">
             <div><dt>Facility</dt><dd>{facility.name}</dd></div>
             {facility.stage === "funded"
-              ? <><div><dt>Draw</dt><dd>{usd(drawable)}</dd></div><div><dt>Duration</dt><dd>{facility.durationLabel}</dd></div><div><dt>Due at maturity</dt><dd>{usd(drawable * (1 + facility.feePct / 100))}</dd></div></>
-              : <><div><dt>Principal</dt><dd>{usd(facility.drawn)}</dd></div><div><dt>Financing fee</dt><dd className="positive">{usd(owed - facility.drawn)}</dd></div><div><dt>Total repayment</dt><dd>{usd(owed)}</dd></div></>}
-            <div><dt>First-loss at risk</dt><dd>{usd(facility.firstLoss)}</dd></div>
+              ? <><div><dt>Draw</dt><dd><TokenAmount value={drawable} asset={facility.asset} /></dd></div><div><dt>Duration</dt><dd>{facility.durationLabel}</dd></div><div><dt>Due at maturity</dt><dd><TokenAmount value={drawable * (1 + facility.feePct / 100)} asset={facility.asset} /></dd></div></>
+              : <><div><dt>Principal</dt><dd><TokenAmount value={facility.drawn} asset={facility.asset} /></dd></div><div><dt>Financing fee</dt><dd className="positive"><TokenAmount value={owed - facility.drawn} asset={facility.asset} /></dd></div><div><dt>Total repayment</dt><dd><TokenAmount value={owed} asset={facility.asset} /></dd></div></>}
+            <div><dt>First-loss at risk</dt><dd><TokenAmount value={facility.firstLoss} asset={facility.asset} /></dd></div>
           </dl>
           <div className="review-actions">
             <button className="secondary-button" disabled={tx.busy} onClick={() => setReviewing(false)}>Back</button>
@@ -312,15 +322,19 @@ export function FacilityDetail({ facility, onBack }: { facility: Facility; onBac
 
       <section className="market-detail-panel">
         <dl className="opportunity-metrics">
-          <div><dt>Credit limit</dt><dd>{usd(facility.limit)}</dd></div>
-          <div><dt>Capital supplied</dt><dd>{usd(facility.supplied)}</dd></div>
+          <div><dt>Credit limit</dt><dd><TokenAmount value={facility.limit} asset={facility.asset} /></dd></div>
+          <div><dt>Capital supplied</dt><dd><TokenAmount value={facility.supplied} asset={facility.asset} /></dd></div>
           <div><dt>Target return</dt><dd>{facility.targetReturn}%</dd></div>
           <div><dt>Protection reserve</dt><dd>{facility.reservePct.toFixed(1)}%</dd></div>
         </dl>
 
         <div className="detail-section">
-          <header><strong>Utilization</strong><span>{facility.limit > 0 ? Math.round((facility.supplied / facility.limit) * 100) : 0}% of the credit limit supplied</span></header>
-          <progress className="accent-progress" max={facility.limit} value={facility.supplied} />
+          <TrancheStructure total={facility.limit} asset={facility.asset} seniorPct={facility.seniorPct} juniorPct={facility.juniorPct} reservePct={facility.reservePct} />
+        </div>
+
+        <div className="detail-section">
+          <header><strong>Funding</strong><span>{fundingState(facility).label}</span></header>
+          {fundingState(facility).accepting && <progress className="accent-progress" max={fundingState(facility).capacity} value={facility.supplied} />}
         </div>
 
         <div className="detail-section">
@@ -383,7 +397,6 @@ export function OriginatorActivity({ events }: { events: BookEvent[] }) {
 
 /* ---- Open a facility ---------------------------------------------------- */
 
-/** Each step is one wallet signature, named by the one still pending. */
 type OpenPhase = "approve" | "open" | "done";
 
 function LockIcon() {
@@ -391,6 +404,25 @@ function LockIcon() {
     <rect x="2.7" y="6.3" width="8.6" height="6" rx="1.6" stroke="currentColor" strokeWidth="1.4" />
     <path d="M4.9 6.3V4.7a2.1 2.1 0 0 1 4.2 0v1.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
   </svg>;
+}
+
+function TrancheStructure({ total, asset, seniorPct, juniorPct, reservePct }: {
+  total: number; asset: string; seniorPct: number; juniorPct: number; reservePct: number;
+}) {
+  const layers = [
+    ["Senior", seniorPct],
+    ["Junior", juniorPct],
+    ["First-loss", reservePct],
+  ] as const;
+  return <div className="tranche-template">
+    <header><div><strong>Risk structure</strong><small>Senior only, Junior is not offered yet</small></div><span>100% allocated</span></header>
+    <div className="tranche-bar" aria-label={`Senior ${seniorPct.toFixed(1)}%, Junior ${juniorPct.toFixed(1)}%, first-loss ${reservePct.toFixed(1)}%`}>
+      {layers.map(([label, percentage]) => <i key={label} title={`${label} ${percentage.toFixed(1)}%`} style={{ width: `${percentage}%` }} />)}
+    </div>
+    <dl>{layers.map(([label, percentage]) => <div key={label}><dt>{label}</dt><dd>{percentage.toFixed(1)}%</dd><small><TokenAmount value={total * percentage / 100} asset={asset} /></small></div>)}</dl>
+    <p><span>Losses</span> First-loss → Junior → Senior</p>
+    <p><span>Recoveries</span> Senior → Junior → First-loss</p>
+  </div>;
 }
 
 export function OpenFacility({ onOpened }: { onOpened: () => void }) {
@@ -409,10 +441,12 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
   const firstLossValue = toNumber(form.firstLoss);
   const feeValue = toNumber(form.feePct);
   const minFirstLoss = (limitValue * MIN_FIRST_LOSS_BPS) / 10_000;
+  const reservePct = limitValue > 0 ? (firstLossValue / limitValue) * 100 : 0;
+  const seniorPct = Math.max(0, 100 - reservePct);
   const meetsFloor = firstLossValue >= minFirstLoss && firstLossValue > 0;
   const affordable = firstLossValue <= balance;
-  const canOpen = form.name.trim() !== "" && form.company.trim() !== "" && limitValue > 0 && meetsFloor && affordable && toNumber(form.duration) > 0 && !!factory;
-  const seniorOpen = Math.min(limitValue - firstLossValue, firstLossValue * 2.25);
+  const canOpen = form.name.trim() !== "" && form.company.trim() !== "" && limitValue > 0 && meetsFloor && reservePct < 100 && affordable && toNumber(form.duration) > 0 && !!factory;
+  const seniorOpen = Math.max(0, Math.min(limitValue - firstLossValue, firstLossValue * 2.25));
 
   const next = async () => {
     if (phase === "approve") {
@@ -440,8 +474,8 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
           <h2>Listed in Markets</h2>
           <p className="panel-copy">{form.name} is live with {usd(firstLossValue)} of first-loss staked.</p>
           <dl className="review-list">
-            <div><dt>Credit limit</dt><dd>{usd(limitValue)}</dd></div>
-            <div><dt>First-loss stake</dt><dd>{usd(firstLossValue)}</dd></div>
+            <div><dt>Credit limit</dt><dd><TokenAmount value={limitValue} asset={symbol} /></dd></div>
+            <div><dt>First-loss stake</dt><dd><TokenAmount value={firstLossValue} asset={symbol} /></dd></div>
             <div><dt>Financing fee</dt><dd>{form.feePct}%</dd></div>
             <div><dt>Duration</dt><dd>{form.duration} min</dd></div>
           </dl>
@@ -463,10 +497,12 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
             <option>Export receivables</option><option>Supply-chain finance</option><option>Commodity finance</option>
           </select>
         </label>
+        <label>Asset<select value={symbol} disabled><option>{symbol}</option></select></label>
         <label>Credit limit<AmountInput value={form.limit} onChange={set("limit")} suffix={symbol} /></label>
         <label>First-loss stake<AmountInput value={form.firstLoss} onChange={set("firstLoss")} suffix={symbol} action={<button onClick={() => set("firstLoss")(String(Math.ceil(minFirstLoss)))}>Min</button>} /></label>
-        <p className="balance-row"><span>Protocol floor ({MIN_FIRST_LOSS_BPS / 100}%)</span><strong>{usd(minFirstLoss)}</strong></p>
-        <p className="balance-row"><span>Wallet balance</span><strong>{usd(balance)}</strong></p>
+        <p className="balance-row"><span>Protocol floor ({MIN_FIRST_LOSS_BPS / 100}%)</span><strong><TokenAmount value={minFirstLoss} asset={symbol} /></strong></p>
+        <p className="balance-row"><span>Wallet balance</span><strong><TokenAmount value={balance} asset={symbol} /></strong></p>
+        <TrancheStructure total={limitValue} asset={symbol} seniorPct={seniorPct} juniorPct={0} reservePct={reservePct} />
         <div className="field-pair">
           <label>Financing fee<div className="amount-input"><input inputMode="decimal" value={form.feePct} onChange={(e) => set("feePct")(e.target.value)} /><span>%</span></div></label>
           <label>Duration<div className="amount-input"><input inputMode="numeric" value={form.duration} onChange={(e) => set("duration")(e.target.value.replace(/\D/g, ""))} /><span>min</span></div></label>
@@ -501,10 +537,10 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
         <div className="detail-section">
           <h2>Terms summary</h2>
           <dl className="detail-list">
-            <div><dt>Credit limit</dt><dd>{usd(limitValue)}</dd></div>
-            <div><dt>First-loss stake</dt><dd>{usd(firstLossValue)}</dd></div>
-            <div><dt>Protection reserve</dt><dd>{limitValue > 0 ? ((firstLossValue / limitValue) * 100).toFixed(1) : "0.0"}%</dd></div>
-            <div><dt>Open to capital providers</dt><dd>{usd(Math.max(0, seniorOpen))}</dd></div>
+            <div><dt>Credit limit</dt><dd><TokenAmount value={limitValue} asset={symbol} /></dd></div>
+            <div><dt>First-loss stake</dt><dd><TokenAmount value={firstLossValue} asset={symbol} /></dd></div>
+            <div><dt>Protection reserve</dt><dd>{reservePct.toFixed(1)}%</dd></div>
+            <div><dt>Open to capital providers</dt><dd><TokenAmount value={seniorOpen} asset={symbol} /></dd></div>
             <div><dt>Financing fee</dt><dd>{form.feePct}%</dd></div>
             <div><dt>Capital provider return</dt><dd>{(feeValue * 0.6).toFixed(2)}%</dd></div>
             <div><dt>Duration</dt><dd>{form.duration} min, then {form.grace} min grace</dd></div>

@@ -25,6 +25,7 @@ export interface Holding {
 
 export interface Facility {
   id: Address;
+  asset: string;
   name: string;
   company: string;
   type: string;
@@ -38,6 +39,8 @@ export interface Facility {
   durationDays: number;
   durationLabel: string;
   reservePct: number;
+  seniorPct: number;
+  juniorPct: number;
   limit: number;
   firstLoss: number;
   supplied: number;
@@ -91,7 +94,7 @@ function availableToSupply(data: FacilityData, stage: Stage) {
   return [data.seniorCapacity, underLimit, underCap].reduce((min, value) => (value < min ? value : min));
 }
 
-export function toFacility(data: FacilityData, position: Position, totals: Totals = NO_TOTALS): Facility {
+export function toFacility(data: FacilityData, position: Position, totals: Totals = NO_TOTALS, asset = "USDC"): Facility {
   const listing = decodeFacilityName(data.name);
   const stage = stageOf(data);
   const feePct = Number(data.terms.financingFeeBps) / 100;
@@ -108,8 +111,11 @@ export function toFacility(data: FacilityData, position: Position, totals: Total
     valueShares(position.seniorShares, data.seniorTotalShares, data.seniorAssets) +
     valueShares(position.juniorShares, data.juniorTotalShares, data.juniorAssets);
 
+  const reservePct = limit > 0 ? ((firstLoss + fromUnits(data.juniorTotalShares > 0n ? data.juniorAssets : 0n)) / limit) * 100 : 0;
+
   return {
     id: data.address,
+    asset,
     ...listing,
     originator: data.originator,
     feePct,
@@ -118,7 +124,9 @@ export function toFacility(data: FacilityData, position: Position, totals: Total
     graceSeconds,
     durationDays: tenorSeconds / 86_400,
     durationLabel: durationText(tenorSeconds),
-    reservePct: limit > 0 ? ((firstLoss + fromUnits(data.juniorTotalShares > 0n ? data.juniorAssets : 0n)) / limit) * 100 : 0,
+    reservePct,
+    seniorPct: 100 - reservePct,
+    juniorPct: 0,
     limit,
     firstLoss,
     supplied: fromUnits(claimableAssets(data)),
@@ -157,4 +165,37 @@ export function waterfallOf(facility: Facility, payment = 0): Waterfall {
     reserveApplied: firstLoss - toReserve,
     supplierLoss: junior + senior - toSuppliers,
   };
+}
+
+const CLOSED_LABEL: Partial<Record<Stage, string>> = {
+  drawn: "Funding closed",
+  late: "Past due",
+  repaid: "Repaid · ready to claim",
+  settled: "Settled · complete",
+  defaulted: "In default",
+  recovered: "Recovery ready to claim",
+  closed: "Closed at loss",
+};
+
+export function fundingState(facility: Pick<Facility, "stage" | "supplied" | "available">) {
+  const accepting = facility.stage === "open" || facility.stage === "funded";
+  const available = accepting ? facility.available : 0;
+  const capacity = facility.supplied + available;
+  const percent = capacity > 0 ? Math.min(100, Math.round((facility.supplied / capacity) * 100)) : 0;
+  return { accepting, available, capacity, percent, label: accepting ? `${percent}% funded` : CLOSED_LABEL[facility.stage]! };
+}
+
+export type MarketAction = "View market" | "View position" | "Claim funds" | "View history" | "Funding closed";
+
+export function marketAction(facility: Pick<Facility, "stage" | "supplied" | "available" | "holding">): MarketAction {
+  if (fundingState(facility).available > 0) return "View market";
+  if (facility.holding.value <= 0 && facility.holding.supplied <= 0) return "Funding closed";
+  if (facility.stage === "repaid" || facility.stage === "recovered") return "Claim funds";
+  if (facility.stage === "settled" || facility.stage === "closed") return "View history";
+  return "View position";
+}
+
+export function realizedReturn(facility: Pick<Facility, "stage" | "holding">) {
+  const paidOut = facility.stage === "repaid" || facility.stage === "settled" || facility.stage === "recovered" || facility.stage === "closed";
+  return paidOut ? facility.holding.value - facility.holding.supplied : 0;
 }

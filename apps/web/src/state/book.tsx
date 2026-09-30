@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Address } from "viem";
 import { useAccount, useChainId, useConfig, useWriteContract } from "wagmi";
@@ -11,13 +11,13 @@ import { useAllFacilityAddresses } from "../hooks/useFactory";
 import { useFacilities, type FacilityData } from "../hooks/useFacilities";
 import { useHistory } from "../hooks/useHistory";
 import { useMyPositions } from "../hooks/usePositions";
-import { fromUnits, toFacility, toUnits, type Facility, type Stage } from "../lib/book";
+import { fromUnits, fundingState, marketAction, toFacility, toUnits, type Facility, type Stage } from "../lib/book";
 import { encodeFacilityName, type Listing } from "../lib/facilityName";
 import { depositedBy, eventsFrom, totalsFrom, type BookEvent } from "../lib/history";
 
 export type { Facility, Stage } from "../lib/book";
 export type { BookEvent } from "../lib/history";
-export { waterfallOf } from "../lib/book";
+export { fundingState, marketAction, realizedReturn, waterfallOf } from "../lib/book";
 
 export const STAGE_LABEL: Record<Stage, string> = {
   open: "Seeking capital",
@@ -67,6 +67,7 @@ interface BookValue {
   me: Address | undefined;
   balance: number;
   factory: Address | undefined;
+  latestSupplyId: Address | null;
   approve: (spender: Address, amount: number) => Promise<void>;
   createFacility: (input: NewFacility) => Promise<void>;
   supply: (id: Address, amount: number) => Promise<void>;
@@ -84,6 +85,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const deployment = useDeployment();
   const { address: me } = useAccount();
+  const [latestSupplyId, setLatestSupplyId] = useState<Address | null>(null);
   const { writeContractAsync } = useWriteContract();
   const { data: addresses } = useAllFacilityAddresses();
   const { facilities: raw } = useFacilities(addresses);
@@ -91,19 +93,19 @@ export function BookProvider({ children }: { children: ReactNode }) {
   const { data: logs } = useHistory(addresses ?? []);
   const { data: balanceUnits } = useAssetBalance(me);
 
+  const symbol = deployment?.assetSymbol ?? "USDC";
   const facilities = useMemo(() => {
     const totals = totalsFrom(logs ?? []);
     const deposited = me ? depositedBy(logs ?? [], me) : new Map<Address, number>();
     return raw
       .map((data) => {
-        const facility = toFacility(data, positions.get(data.address) ?? { seniorShares: 0n, juniorShares: 0n }, totals.get(data.address));
+        const facility = toFacility(data, positions.get(data.address) ?? { seniorShares: 0n, juniorShares: 0n }, totals.get(data.address), symbol);
         const supplied = deposited.get(data.address);
         return supplied ? { ...facility, holding: { ...facility.holding, supplied } } : facility;
       })
       .reverse();
-  }, [raw, positions, logs, me]);
+  }, [raw, positions, logs, me, symbol]);
 
-  const symbol = deployment?.assetSymbol ?? "USDC";
   const events = useMemo(() => {
     const names = new Map(facilities.map((facility) => [facility.id, facility.name]));
     return eventsFrom(logs ?? [], (id) => names.get(id) ?? "Facility", symbol);
@@ -157,6 +159,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
   const supply = useCallback(async (id: Address, amount: number) => {
     await approveUnits(id, toUnits(amount));
     await send({ ...facilityContract(id), chainId, functionName: "deposit", args: [SENIOR, toUnits(amount)] });
+    setLatestSupplyId(id);
   }, [approveUnits, chainId, send]);
 
   const draw = useCallback(async (id: Address) => {
@@ -193,6 +196,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
     me,
     balance: balanceUnits !== undefined ? fromUnits(balanceUnits) : 0,
     factory: deployment?.factory,
+    latestSupplyId,
     approve,
     createFacility,
     supply,
@@ -200,7 +204,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
     repay,
     claim,
     recover,
-  }), [approve, balanceUnits, claim, createFacility, deployment, draw, events, facilities, me, recover, repay, supply, symbol]);
+  }), [approve, balanceUnits, claim, createFacility, deployment, draw, events, facilities, latestSupplyId, me, recover, repay, supply, symbol]);
 
   return <BookContext.Provider value={value}>{children}</BookContext.Provider>;
 }
@@ -247,6 +251,7 @@ const STAGE_STATUS: Record<Stage, MarketStatus> = {
 };
 
 export function facilityAsMarket(facility: Facility, symbol: string): Market {
+  const funding = fundingState(facility);
   return {
     id: facility.id,
     name: facility.name,
@@ -257,10 +262,15 @@ export function facilityAsMarket(facility: Facility, symbol: string): Market {
     asset: symbol,
     status: STAGE_STATUS[facility.stage],
     targetReturn: `${facility.targetReturn}%`,
-    available: `${facility.available.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${symbol}`,
+    available: funding.available.toLocaleString("en-US", { maximumFractionDigits: 2 }),
     duration: facility.durationLabel,
     reserve: `${facility.reservePct.toFixed(1)}%`,
-    funded: facility.limit > 0 ? Math.min(100, Math.round((facility.supplied / facility.limit) * 100)) : 0,
+    seniorPct: facility.seniorPct,
+    juniorPct: facility.juniorPct,
+    funded: funding.percent,
+    accepting: funding.accepting,
+    fundingLabel: funding.label,
+    action: marketAction(facility),
   };
 }
 
