@@ -20,6 +20,7 @@ contract ScenarioTest is Test {
     function setUp() public {
         usdc = new TestUSDC();
         factory = new AnoraFactory(address(usdc), riskAgent, 1_000);
+        factory.setOriginatorApproved(originator, true);
         address[3] memory who = [seniorLender, juniorLender, originator];
         for (uint256 i = 0; i < who.length; i++) {
             usdc.mint(who[i], 500_000 * USDC);

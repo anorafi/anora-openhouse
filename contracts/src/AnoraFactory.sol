@@ -14,6 +14,7 @@ contract AnoraFactory is Ownable2Step, Pausable {
     using SafeERC20 for IERC20;
 
     error FirstLossTooSmall();
+    error OriginatorNotApproved();
     error InvalidTerms();
     error ZeroAddress();
 
@@ -24,12 +25,14 @@ contract AnoraFactory is Ownable2Step, Pausable {
     address public riskAgent;
     uint256 public minFirstLossBps;
     address[] public facilities;
+    mapping(address => bool) public approvedOriginators;
 
     event FacilityCreated(
         address indexed facility, address indexed originator, string name, uint256 limit, uint256 firstLoss
     );
     event RiskAgentChanged(address indexed previous, address indexed next);
     event MinFirstLossChanged(uint256 previousBps, uint256 nextBps);
+    event OriginatorApprovalChanged(address indexed originator, bool approved);
 
     constructor(address asset_, address riskAgent_, uint256 minFirstLossBps_) Ownable(msg.sender) {
         if (asset_ == address(0) || riskAgent_ == address(0)) revert ZeroAddress();
@@ -53,6 +56,7 @@ contract AnoraFactory is Ownable2Step, Pausable {
         whenNotPaused
         returns (address facility)
     {
+        if (!approvedOriginators[msg.sender]) revert OriginatorNotApproved();
         if (
             terms.limit == 0 || terms.tenor == 0 || terms.firstLoss > terms.limit || terms.capitalCap < terms.firstLoss
                 || terms.financingFeeBps > BPS || terms.lateFeePerDayBps > BPS || terms.seniorFeeShareBps > BPS
@@ -69,6 +73,12 @@ contract AnoraFactory is Ownable2Step, Pausable {
         if (next == address(0)) revert ZeroAddress();
         emit RiskAgentChanged(riskAgent, next);
         riskAgent = next;
+    }
+
+    function setOriginatorApproved(address originator, bool approved) external onlyOwner {
+        if (originator == address(0)) revert ZeroAddress();
+        approvedOriginators[originator] = approved;
+        emit OriginatorApprovalChanged(originator, approved);
     }
 
     function setMinFirstLossBps(uint256 nextBps) external onlyOwner {

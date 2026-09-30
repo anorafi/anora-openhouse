@@ -23,6 +23,7 @@ contract AnoraFacilityTest is Test {
         usdc.mint(senior1, 1_000_000 * USDC);
         usdc.mint(junior1, 1_000_000 * USDC);
         usdc.mint(originator, 1_000_000 * USDC);
+        factory.setOriginatorApproved(originator, true);
         vm.prank(originator);
         usdc.approve(address(factory), type(uint256).max);
     }
@@ -438,5 +439,75 @@ contract AnoraFacilityTest is Test {
         vm.prank(originator);
         vm.expectRevert(AnoraFacility.PastDue.selector);
         f.drawdown(1 * USDC);
+    }
+
+    function test_seniorOnlyFacilityLeavesNoStuckAssetsAfterRepayAndClaim() public {
+        AnoraFacility f = _open();
+        vm.prank(senior1);
+        f.deposit(AnoraFacility.Tranche.Senior, 60_000 * USDC);
+        vm.prank(originator);
+        f.drawdown(50_000 * USDC);
+        vm.prank(originator);
+        f.repay(51_000 * USDC);
+
+        assertEq(usdc.balanceOf(address(f)), f.seniorAssets() + f.juniorAssets() + f.firstLossReserve());
+        assertEq(f.juniorAssets(), 0);
+
+        vm.prank(senior1);
+        f.withdraw(AnoraFacility.Tranche.Senior, 60_000 * USDC);
+
+        assertEq(usdc.balanceOf(senior1), 1_000_000 * USDC + 1_000 * USDC);
+        assertEq(usdc.balanceOf(address(f)), 0);
+    }
+
+    function test_feeStillSplitsWhenJuniorHoldersExist() public {
+        AnoraFacility f = _drawn();
+        vm.prank(originator);
+        f.repay(204_000 * USDC);
+        assertEq(f.seniorAssets(), 270_000 * USDC + 2_400 * USDC);
+        assertEq(f.juniorAssets(), 120_000 * USDC + 1_600 * USDC);
+    }
+
+    function test_createFacilityRejectsUnapprovedOriginator() public {
+        address stranger = makeAddr("stranger");
+        usdc.mint(stranger, 100_000 * USDC);
+        vm.startPrank(stranger);
+        usdc.approve(address(factory), type(uint256).max);
+        vm.expectRevert(AnoraFactory.OriginatorNotApproved.selector);
+        factory.createFacility("Unapproved", _terms(300_000 * USDC, 30_000 * USDC));
+        vm.stopPrank();
+    }
+
+    function test_createFacilityWorksOnceOriginatorApproved() public {
+        address stranger = makeAddr("stranger");
+        usdc.mint(stranger, 100_000 * USDC);
+        vm.prank(stranger);
+        usdc.approve(address(factory), type(uint256).max);
+        factory.setOriginatorApproved(stranger, true);
+        assertTrue(factory.approvedOriginators(stranger));
+        vm.prank(stranger);
+        factory.createFacility("Approved", _terms(300_000 * USDC, 30_000 * USDC));
+        assertEq(factory.facilityCount(), 1);
+    }
+
+    function test_revokedOriginatorCannotOpenNewFacility() public {
+        factory.setOriginatorApproved(originator, false);
+        vm.prank(originator);
+        vm.expectRevert(AnoraFactory.OriginatorNotApproved.selector);
+        factory.createFacility("Revoked", _terms(300_000 * USDC, 30_000 * USDC));
+    }
+
+    function test_onlyOwnerSetsOriginatorApproval() public {
+        address stranger = makeAddr("stranger");
+        vm.prank(originator);
+        vm.expectRevert();
+        factory.setOriginatorApproved(stranger, true);
+    }
+
+    function test_originatorApprovalEmitsEvent() public {
+        address stranger = makeAddr("stranger");
+        vm.expectEmit(true, false, false, true);
+        emit AnoraFactory.OriginatorApprovalChanged(stranger, true);
+        factory.setOriginatorApproved(stranger, true);
     }
 }
