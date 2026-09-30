@@ -27,7 +27,7 @@ export function App() {
 
 function Shell() {
   const deployment = useDeployment();
-  const { facilities, events, symbol, me, latestSupplyId, approve, supply, claim } = useBook();
+  const { facilities, events, symbol, me, latestSupplyId, historyError, approve, supply, claim } = useBook();
   const initialPage = window.location.hash.slice(1) as Page;
   const [page, setPage] = useState<Page>(PAGES.includes(initialPage) ? initialPage : "home");
   const [role, setRole] = useState<Role>("investor");
@@ -68,6 +68,7 @@ function Shell() {
       <Sidebar role={role} page={page} onRole={switchRole} onNavigate={navigate} onHome={() => navigate("home")} />
       <div className="shell-main">
         <Header />
+        {historyError && <p className="history-warn" role="alert">{historyError}</p>}
         <main className="main">
           {!deployment ? <NotDeployed /> : <>
             {page === "markets" && <Markets onReview={review} onPortfolio={() => navigate("portfolio")} onHistory={() => navigate("activity")} />}

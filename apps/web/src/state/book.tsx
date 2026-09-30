@@ -10,6 +10,7 @@ import { useDeployment } from "../hooks/useDeployment";
 import { useAllFacilityAddresses } from "../hooks/useFactory";
 import { useFacilities, type FacilityData } from "../hooks/useFacilities";
 import { useHistory } from "../hooks/useHistory";
+import { describeIndexerError } from "../lib/indexer";
 import { useMyPositions } from "../hooks/usePositions";
 import { draftSizeFor, fromUnits, fundingState, marketAction, toFacility, toUnits, type DraftSize, type Facility, type Stage } from "../lib/book";
 import { encodeFacilityName, type Listing } from "../lib/facilityName";
@@ -69,6 +70,7 @@ interface BookValue {
   balance: number;
   factory: Address | undefined;
   latestSupplyId: Address | null;
+  historyError: string | null;
   approve: (spender: Address, amount: number) => Promise<void>;
   createFacility: (input: NewFacility) => Promise<void>;
   supply: (id: Address, amount: number) => Promise<void>;
@@ -91,7 +93,8 @@ export function BookProvider({ children }: { children: ReactNode }) {
   const { data: addresses } = useAllFacilityAddresses();
   const { facilities: raw } = useFacilities(addresses);
   const { positions } = useMyPositions(addresses, me);
-  const { data: logs } = useHistory(addresses ?? []);
+  const { data: logs, error: historyFailure } = useHistory(addresses ?? []);
+  const historyError = historyFailure ? describeIndexerError(historyFailure) : null;
   const { data: balanceUnits } = useAssetBalance(me);
 
   const symbol = deployment?.assetSymbol ?? "USDC";
@@ -203,6 +206,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
     balance: balanceUnits !== undefined ? fromUnits(balanceUnits) : 0,
     factory: deployment?.factory,
     latestSupplyId,
+    historyError,
     approve,
     createFacility,
     supply,
@@ -210,7 +214,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
     repay,
     claim,
     recover,
-  }), [approve, balanceUnits, claim, createFacility, deployment, draw, events, facilities, latestSupplyId, me, recover, repay, supply, symbol]);
+  }), [approve, balanceUnits, claim, createFacility, deployment, draw, events, facilities, historyError, latestSupplyId, me, recover, repay, supply, symbol]);
 
   return <BookContext.Provider value={value}>{children}</BookContext.Provider>;
 }

@@ -638,6 +638,7 @@ progress::-moz-progress-bar { background: var(--fill); border-radius: 999px; }
 /* ---- Originator --------------------------------------------------------- */
 .originator-layout { display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); gap: 14px; margin-top: 20px; align-items: start; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.history-warn { margin: 0; padding: 9px 24px; color: var(--warning); background: var(--warning-soft); border-bottom: 1px solid #f0d9a8; font-size: 12px; }
 .facility-warn { margin: 12px 0 0; padding: 9px 12px; color: var(--warning); background: var(--warning-soft); border: 1px solid #f0d9a8; border-radius: 7px; font-size: 12px; }
 .tranche-template { margin: 2px 0 18px; padding: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; }
 .tranche-template header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

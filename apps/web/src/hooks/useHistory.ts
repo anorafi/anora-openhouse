@@ -3,6 +3,7 @@ import { decodeEventLog, type Address, type Hex } from "viem";
 import { useChainId } from "wagmi";
 import { AnoraFacilityAbi, AnoraFactoryAbi } from "../abi";
 import type { ChainLog } from "../lib/history";
+import { fetchIndexerActivity } from "../lib/indexer";
 import { useDeployment } from "./useDeployment";
 
 const MAX_PAGES = 5;
@@ -54,13 +55,16 @@ export function useHistory(facilities: readonly Address[]) {
   const chainId = useChainId();
   const deployment = useDeployment();
   const factory = deployment?.factory;
+  const indexerApi = deployment?.indexerApi;
   const api = deployment?.logsApi;
 
   return useQuery({
-    queryKey: ["history", chainId, factory, facilities.join(",")],
-    enabled: !!api && !!factory,
+    queryKey: ["history", indexerApi ? "indexer" : "explorer", chainId, factory, indexerApi ? "" : facilities.join(",")],
+    enabled: (!!indexerApi || !!api) && !!factory,
     refetchInterval: 10_000,
+    retry: indexerApi ? 1 : 3,
     queryFn: async () => {
+      if (indexerApi) return fetchIndexerActivity(fetch, indexerApi, chainId);
       const pages = await Promise.all([factory!, ...facilities].map((address) => fetchLogs(api!, address).catch(() => [])));
       return pages.flat().map(decode).filter((log): log is ChainLog => log !== null);
     },
