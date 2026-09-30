@@ -17,6 +17,7 @@
         "decimals": 18
       },
       "alchemyHost": "arb-sepolia",
+      "logsApi": "https://arbitrum-sepolia.blockscout.com/api/v2",
       "asset": {
         "address": "0x38513243bA873d05b8b1E6622fE12e7685E4eAc6",
         "symbol": "TestUSDC",
@@ -49,6 +50,7 @@
       },
       "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
       "alchemyHost": "robinhood-mainnet",
+      "logsApi": "https://robinhoodchain.blockscout.com/api/v2",
       "asset": {
         "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
         "symbol": "USDG",

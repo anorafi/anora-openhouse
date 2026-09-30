@@ -15,6 +15,7 @@ interface ChainMeta {
   confirmations: number;
   multicall3?: Address;
   alchemyHost?: string;
+  logsApi: string;
 }
 
 const META: Record<string, ChainMeta> = {
@@ -24,6 +25,7 @@ const META: Record<string, ChainMeta> = {
     rpcUrl: "https://sepolia-rollup.arbitrum.io/rpc",
     confirmations: 2,
     alchemyHost: "arb-sepolia",
+    logsApi: "https://arbitrum-sepolia.blockscout.com/api/v2",
   },
   robinhood: {
     key: "robinhood",
@@ -32,6 +34,7 @@ const META: Record<string, ChainMeta> = {
     confirmations: 2,
     multicall3: "0xcA11bde05977b3631167028862bE2a173976CA11",
     alchemyHost: "robinhood-mainnet",
+    logsApi: "https://robinhoodchain.blockscout.com/api/v2",
   },
 };
 
@@ -92,6 +95,7 @@ async function buildNetwork(key: string, entry: RawDeployment) {
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
     ...(meta.multicall3 ? { multicall3: meta.multicall3 } : {}),
     ...(meta.alchemyHost ? { alchemyHost: meta.alchemyHost } : {}),
+    logsApi: meta.logsApi,
     asset: { address: entry.asset as Address, symbol: entry.assetSymbol, decimals: assetDecimals, faucet: entry.faucet },
     contracts: { factory, facilityImplementation: entry.AnoraFacilityImplementation as Address },
     deploymentBlock: block.toString(),

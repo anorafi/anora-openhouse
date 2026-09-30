@@ -18,6 +18,7 @@ export interface ManifestNetwork {
   nativeCurrency: { name: string; symbol: string; decimals: number };
   multicall3?: Address;
   alchemyHost?: string;
+  logsApi?: string;
   asset: { address: Address; symbol: string; decimals: number; faucet: boolean };
   contracts: { factory: Address; facilityImplementation: Address };
   deploymentBlock: string;
@@ -42,6 +43,7 @@ export interface Deployment {
   confirmations: number;
   writes: boolean;
   deploymentBlock: bigint;
+  logsApi?: string;
 }
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -101,6 +103,7 @@ function parseNetwork(value: unknown, index: number): ManifestNetwork {
     },
     ...(raw.multicall3 === undefined ? {} : { multicall3: address(raw.multicall3, `${at}.multicall3`) }),
     ...(raw.alchemyHost === undefined ? {} : { alchemyHost: text(raw.alchemyHost, `${at}.alchemyHost`) }),
+    ...(raw.logsApi === undefined ? {} : { logsApi: httpsUrl(raw.logsApi, `${at}.logsApi`) }),
     asset: {
       address: address(asset.address, `${at}.asset.address`),
       symbol: text(asset.symbol, `${at}.asset.symbol`),
@@ -163,6 +166,7 @@ export function deploymentOf(network: ManifestNetwork): Deployment {
     confirmations: network.confirmations,
     writes: network.features.writes,
     deploymentBlock: BigInt(network.deploymentBlock),
+    logsApi: network.logsApi,
   };
 }
 

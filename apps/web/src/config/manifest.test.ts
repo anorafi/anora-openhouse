@@ -94,6 +94,12 @@ describe("parseManifest", () => {
     expect(() => parseManifest(manifest({ networks: off, defaultChainId: 4663 }))).toThrow(/enabled/i);
   });
 
+  it("accepts an optional logs api and rejects a malformed one", () => {
+    const parsed = parseManifest(manifest({ networks: [network({ logsApi: "https://explorer.example/api/v2" })] }));
+    expect(parsed.networks[0].logsApi).toBe("https://explorer.example/api/v2");
+    expect(() => parseManifest(manifest({ networks: [network({ logsApi: "nope" })] }))).toThrow(/logsApi/);
+  });
+
   it("rejects a non-https rpc url", () => {
     expect(() => parseManifest(manifest({ networks: [network({ rpcUrl: "ftp://x" })] }))).toThrow(/rpcUrl/);
   });
@@ -134,7 +140,9 @@ describe("deploymentOf", () => {
       confirmations: 2,
       writes: true,
       deploymentBlock: 19434064n,
+      logsApi: undefined,
     });
+    expect(deploymentOf(parseManifest(manifest({ networks: [network({ logsApi: "https://explorer.example/api/v2" })] })).networks[0]).logsApi).toBe("https://explorer.example/api/v2");
   });
 });
 
