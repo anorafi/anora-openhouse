@@ -14,6 +14,7 @@ contract AnoraFactory is Ownable2Step, Pausable {
     using SafeERC20 for IERC20;
 
     error FirstLossTooSmall();
+    error InvalidTerms();
     error ZeroAddress();
 
     uint256 public constant BPS = 10_000;
@@ -52,6 +53,10 @@ contract AnoraFactory is Ownable2Step, Pausable {
         whenNotPaused
         returns (address facility)
     {
+        if (
+            terms.limit == 0 || terms.tenor == 0 || terms.firstLoss > terms.limit || terms.capitalCap < terms.firstLoss
+                || terms.financingFeeBps > BPS || terms.lateFeePerDayBps > BPS || terms.seniorFeeShareBps > BPS
+        ) revert InvalidTerms();
         if (terms.firstLoss < terms.limit * minFirstLossBps / BPS) revert FirstLossTooSmall();
         facility = Clones.clone(implementation);
         facilities.push(facility);

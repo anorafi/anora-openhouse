@@ -383,4 +383,60 @@ contract AnoraFacilityTest is Test {
         uint256 returnedToOriginator = firstLossBefore - lf;
         assertEq(f.totalCapital() + lf + lj + ls + returnedToOriginator, 420_000 * USDC);
     }
+
+    function test_createFacilityRejectsFeeShareAboveBps() public {
+        AnoraFacility.Terms memory t = _terms(300_000 * USDC, 30_000 * USDC);
+        t.seniorFeeShareBps = 10_001;
+        vm.prank(originator);
+        vm.expectRevert(AnoraFactory.InvalidTerms.selector);
+        factory.createFacility("Bad fee share", t);
+    }
+
+    function test_createFacilityRejectsFinancingFeeAboveBps() public {
+        AnoraFacility.Terms memory t = _terms(300_000 * USDC, 30_000 * USDC);
+        t.financingFeeBps = 10_001;
+        vm.prank(originator);
+        vm.expectRevert(AnoraFactory.InvalidTerms.selector);
+        factory.createFacility("Bad financing fee", t);
+    }
+
+    function test_createFacilityRejectsZeroTenor() public {
+        AnoraFacility.Terms memory t = _terms(300_000 * USDC, 30_000 * USDC);
+        t.tenor = 0;
+        vm.prank(originator);
+        vm.expectRevert(AnoraFactory.InvalidTerms.selector);
+        factory.createFacility("Zero tenor", t);
+    }
+
+    function test_createFacilityRejectsZeroLimit() public {
+        AnoraFacility.Terms memory t = _terms(0, 0);
+        vm.prank(originator);
+        vm.expectRevert(AnoraFactory.InvalidTerms.selector);
+        factory.createFacility("Zero limit", t);
+    }
+
+    function test_createFacilityRejectsFirstLossAboveLimit() public {
+        AnoraFacility.Terms memory t = _terms(300_000 * USDC, 400_000 * USDC);
+        vm.prank(originator);
+        vm.expectRevert(AnoraFactory.InvalidTerms.selector);
+        factory.createFacility("First loss above limit", t);
+    }
+
+    function test_createFacilityRejectsCapBelowFirstLoss() public {
+        AnoraFacility.Terms memory t = _terms(300_000 * USDC, 30_000 * USDC);
+        t.capitalCap = 10_000 * USDC;
+        vm.prank(originator);
+        vm.expectRevert(AnoraFactory.InvalidTerms.selector);
+        factory.createFacility("Cap below first loss", t);
+    }
+
+    function test_drawdownRejectedAfterDueDate() public {
+        AnoraFacility f = _seeded();
+        vm.prank(originator);
+        f.drawdown(100_000 * USDC);
+        vm.warp(block.timestamp + 90 days + 1);
+        vm.prank(originator);
+        vm.expectRevert(AnoraFacility.PastDue.selector);
+        f.drawdown(1 * USDC);
+    }
 }
