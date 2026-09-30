@@ -961,6 +961,11 @@ export const AnoraFacilityAbi = [
   },
   {
     "type": "error",
+    "name": "PastDue",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ReentrancyGuardReentrantCall",
     "inputs": []
   },

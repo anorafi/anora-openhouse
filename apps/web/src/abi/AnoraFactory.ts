@@ -55,6 +55,25 @@ export const AnoraFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "approvedOriginators",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "asset",
     "inputs": [],
     "outputs": [
@@ -276,6 +295,24 @@ export const AnoraFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "setOriginatorApproved",
+    "inputs": [
+      {
+        "name": "originator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "approved",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setRiskAgent",
     "inputs": [
       {
@@ -359,6 +396,25 @@ export const AnoraFactoryAbi = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OriginatorApprovalChanged",
+    "inputs": [
+      {
+        "name": "originator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "approved",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
       }
     ],
     "anonymous": false
@@ -481,6 +537,16 @@ export const AnoraFactoryAbi = [
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidTerms",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "OriginatorNotApproved",
+    "inputs": []
   },
   {
     "type": "error",
