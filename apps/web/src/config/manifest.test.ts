@@ -49,6 +49,13 @@ describe("parseManifest", () => {
     expect(parsed.networks[1].alchemyHost).toBe("robinhood-mainnet");
   });
 
+  it("keeps an optional public rpc fallback and validates it", () => {
+    const parsed = parseManifest(manifest({ networks: [network({ publicRpcUrl: "https://sepolia-rollup.arbitrum.io/rpc" }), robinhood()] }));
+    expect(parsed.networks[0].publicRpcUrl).toBe("https://sepolia-rollup.arbitrum.io/rpc");
+    expect(parsed.networks[1].publicRpcUrl).toBeUndefined();
+    expect(() => parseManifest(manifest({ networks: [network({ publicRpcUrl: "ftp://x" })] }))).toThrow(/publicRpcUrl/);
+  });
+
   it("rejects anything that is not an object", () => {
     expect(() => parseManifest(null)).toThrow(ManifestError);
     expect(() => parseManifest("nope")).toThrow(ManifestError);

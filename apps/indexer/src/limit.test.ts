@@ -19,6 +19,12 @@ describe("classify", () => {
     expect(classify("PUT", "/v1/uploads/abc")).toBe("write");
   });
 
+  test("puts json-rpc proxy calls in their own class", () => {
+    expect(classify("POST", "/rpc/421614")).toBe("rpc");
+    expect(classify("POST", "/rpc/4663")).toBe("rpc");
+    expect(classify("GET", "/rpc/4663")).toBe("rpc");
+  });
+
   test("puts other reads in the read class and exempts health", () => {
     expect(classify("GET", "/v1/activity")).toBe("read");
     expect(classify("GET", "/v1/downloads/abc")).toBe("read");
@@ -91,5 +97,14 @@ describe("limiter", () => {
     time.advance(120_000);
     limiter.take("9.9.9.9", "read");
     expect(limiter.size()).toBe(1);
+  });
+});
+
+describe("rpc class", () => {
+  test("has a larger default budget than plain reads", () => {
+    const limiter = createLimiter({ now: () => 0 });
+    let taken = 0;
+    while (limiter.take("a", "rpc").ok && taken < 1000) taken += 1;
+    expect(taken).toBe(600);
   });
 });

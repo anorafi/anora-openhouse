@@ -10,7 +10,9 @@ import { createLimiter } from "./limit";
 import { createChainReader, createRpcReaders } from "./meta/chain";
 import { createMetaRoutes } from "./meta/service";
 import { openMetaStore } from "./meta/store";
+import { createRpcProxy } from "./rpc";
 import { syncChain, type ChainClient } from "./sync";
+import { upstreamsFor } from "./upstreams";
 
 const manifestPath = process.env.INDEXER_MANIFEST ?? new URL("../../web/public/manifest.json", import.meta.url).pathname;
 const dbPath = process.env.INDEXER_DB ?? `${process.env.HOME}/.local/share/anora-indexer/index.db`;
@@ -32,6 +34,10 @@ const networks = manifest.networks.filter((network) => network.enabled);
 mkdirSync(dirname(dbPath), { recursive: true });
 const db = openDb(dbPath);
 const status = new Map<number, ChainStatus>();
+const providerKey = process.env.ALCHEMY_API_KEY;
+const upstreamMap = new Map(networks.map((network) => [network.chainId, upstreamsFor(network, providerKey)]));
+const rpcProxy = createRpcProxy({ upstreams: (chainId) => upstreamMap.get(chainId), fetch: (url, init) => fetch(url, init), now: () => Date.now() });
+const directUrls = (network: (typeof networks)[number]) => upstreamMap.get(network.chainId)?.length ? (upstreamMap.get(network.chainId) as string[]) : [network.rpcUrl];
 
 function watch(client: ChainClient, chainId: number): ChainClient {
   return {
@@ -46,7 +52,7 @@ function watch(client: ChainClient, chainId: number): ChainClient {
 }
 
 async function loop(network: (typeof networks)[number]) {
-  const client = watch(createChainClient(network.rpcUrl), network.chainId);
+  const client = watch(createChainClient(directUrls(network)), network.chainId);
   const target = { chainId: network.chainId, factory: network.contracts.factory as Hex, deploymentBlock: BigInt(network.deploymentBlock), confirmations: network.confirmations };
   status.set(network.chainId, { indexedBlock: db.cursor(network.chainId), chainBlock: null, error: null });
   for (;;) {
@@ -72,7 +78,7 @@ const clock = () => Math.floor(Date.now() / 1000);
 
 const meta = createMetaRoutes({
   store: openMetaStore(metaDbPath),
-  chain: createChainReader(createRpcReaders(networks)),
+  chain: createChainReader(createRpcReaders(networks.map((network) => ({ chainId: network.chainId, rpcUrl: directUrls(network)[0] })))),
   db,
   auth: { domain: metaDomain, chains: networks.map((network) => network.chainId), now: clock, nonceTtl: 300, sessionTtl: 3600 },
   secret,
@@ -89,6 +95,7 @@ const handler = createHandler({
   origins,
   meta,
   limiter: createLimiter({ now: () => Date.now() }),
+  rpc: (chainId, payload) => rpcProxy.handle(chainId, payload),
 });
 
 Bun.serve({ port, hostname: "127.0.0.1", fetch: (request, server) => handler(request, server.requestIP(request)?.address) });

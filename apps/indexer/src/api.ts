@@ -1,6 +1,7 @@
 import { decodeCursor, type Db, type StoredEvent } from "./db";
 import { deriveFacility, derivePositions } from "./derive";
 import { classify, type createLimiter } from "./limit";
+import type { RpcReply } from "./rpc";
 
 export interface ChainStatus {
   indexedBlock: bigint | null;
@@ -24,6 +25,7 @@ export interface ApiDeps {
   origins: string[];
   meta?: (request: Request, url: URL) => Promise<Response | null>;
   limiter?: ReturnType<typeof createLimiter>;
+  rpc?: (chainId: number, payload: unknown) => Promise<RpcReply>;
 }
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -31,6 +33,7 @@ const LOCAL_ORIGIN = /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/;
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
 const MAX_JSON_BYTES = 64 * 1024;
+const MAX_RPC_BYTES = 256 * 1024;
 const LOCAL_PEER = /^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/;
 
 class ApiError extends Error {
@@ -219,6 +222,21 @@ export function createHandler(deps: ApiDeps) {
     if (deps.limiter) {
       const taken = deps.limiter.take(clientOf(request, peer), cls);
       if (!taken.ok) return send({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, 429, { ...cors, "retry-after": String(taken.retryAfter) });
+    }
+    const proxied = url.pathname.match(/^\/rpc\/(\d+)$/);
+    if (url.pathname.startsWith("/rpc/") && !(deps.rpc && proxied)) return send({ error: { code: "NOT_FOUND", message: "Unknown route." } }, 404, cors);
+    if (deps.rpc && proxied) {
+      if (request.method !== "POST") return send({ error: { code: "METHOD_NOT_ALLOWED", message: "Only POST is supported." } }, 405, cors);
+      const bounded = await capped(request, MAX_RPC_BYTES);
+      if (!bounded) return send({ error: { code: "PAYLOAD_TOO_LARGE", message: "Request body is too large." } }, 413, cors);
+      let payload: unknown;
+      try {
+        payload = JSON.parse(await bounded.text());
+      } catch {
+        return send({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error." } }, 400, cors);
+      }
+      const reply = await deps.rpc(Number(proxied[1]), payload);
+      return send(reply.body, reply.status, cors);
     }
     if (request.method === "POST") {
       const bounded = await capped(request, MAX_JSON_BYTES);

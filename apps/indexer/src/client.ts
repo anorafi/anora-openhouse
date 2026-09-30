@@ -1,9 +1,11 @@
-import { createPublicClient, http, type Hex } from "viem";
+import { createPublicClient, fallback, http, type Hex } from "viem";
 import type { RawLog } from "./events";
 import type { ChainClient } from "./sync";
 
-export function createChainClient(rpcUrl: string): ChainClient {
-  const client = createPublicClient({ transport: http(rpcUrl, { retryCount: 3, retryDelay: 500, timeout: 30_000 }) });
+export function createChainClient(rpcUrls: string | string[]): ChainClient {
+  const urls = Array.isArray(rpcUrls) ? rpcUrls : [rpcUrls];
+  const nodes = urls.map((url) => http(url, { retryCount: 3, retryDelay: 500, timeout: 30_000 }));
+  const client = createPublicClient({ transport: nodes.length > 1 ? fallback(nodes) : nodes[0] });
   return {
     getBlockNumber: () => client.getBlockNumber(),
     async getLogs({ address, fromBlock, toBlock }) {

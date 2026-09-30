@@ -13,6 +13,7 @@ export interface ManifestNetwork {
   name: string;
   enabled: boolean;
   rpcUrl: string;
+  publicRpcUrl?: string;
   explorerUrl: string;
   confirmations: number;
   nativeCurrency: { name: string; symbol: string; decimals: number };
@@ -96,6 +97,7 @@ function parseNetwork(value: unknown, index: number): ManifestNetwork {
     name: text(raw.name, `${at}.name`),
     enabled: flag(raw.enabled, `${at}.enabled`),
     rpcUrl: httpsUrl(raw.rpcUrl, `${at}.rpcUrl`),
+    ...(raw.publicRpcUrl === undefined ? {} : { publicRpcUrl: httpsUrl(raw.publicRpcUrl, `${at}.publicRpcUrl`) }),
     explorerUrl: httpsUrl(raw.explorerUrl, `${at}.explorerUrl`),
     confirmations: integer(raw.confirmations, `${at}.confirmations`),
     nativeCurrency: {

@@ -327,3 +327,78 @@ describe("rate limiting", () => {
     expect(size).toBe(200 * 1024);
   });
 });
+
+describe("rpc proxy route", () => {
+  const seen: { chainId: number; payload: unknown }[] = [];
+  const proxied = (options: { limiter?: ReturnType<typeof createLimiter> } = {}) => {
+    seen.length = 0;
+    const handle = createHandler({
+      db,
+      networks: [{ chainId: 421614, key: "arbitrum-sepolia", name: "Arbitrum Sepolia", confirmations: 2 }],
+      status,
+      maxLag: 50n,
+      now: () => NOW,
+      origins: ["https://openhouse.anora.finance"],
+      limiter: options.limiter,
+      rpc: async (chainId, payload) => {
+        seen.push({ chainId, payload });
+        return { status: 200, body: { jsonrpc: "2.0", id: 1, result: "0x1" } };
+      },
+    });
+    return (path: string, init?: RequestInit, peer = "203.0.113.5") => handle(new Request(`http://127.0.0.1:8100${path}`, init), peer);
+  };
+  const post = (body: unknown, headers: Record<string, string> = {}) => ({ method: "POST", body: typeof body === "string" ? body : JSON.stringify(body), headers: { "content-type": "application/json", ...headers } });
+
+  test("forwards a json-rpc post to the proxy with the chain id", async () => {
+    const send = proxied();
+    const response = await send("/rpc/421614", post({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }));
+    expect(response.status).toBe(200);
+    expect((await json(response)).result).toBe("0x1");
+    expect(seen).toEqual([{ chainId: 421614, payload: { jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] } }]);
+  });
+
+  test("answers only post and rejects bad chain ids and bad json", async () => {
+    const send = proxied();
+    expect((await send("/rpc/421614")).status).toBe(405);
+    expect((await send("/rpc/abc", post({}))).status).toBe(404);
+    const bad = await send("/rpc/421614", post("{nope"));
+    expect(bad.status).toBe(400);
+    expect((await json(bad)).error.code).toBe(-32700);
+    expect(seen).toHaveLength(0);
+  });
+
+  test("allows bodies above the json limit but not above the rpc limit", async () => {
+    const send = proxied();
+    const medium = { jsonrpc: "2.0", id: 1, method: "eth_call", params: ["x".repeat(100 * 1024)] };
+    expect((await send("/rpc/421614", post(medium))).status).toBe(200);
+    const large = { jsonrpc: "2.0", id: 1, method: "eth_call", params: ["x".repeat(300 * 1024)] };
+    expect((await send("/rpc/421614", post(large))).status).toBe(413);
+  });
+
+  test("sets cors headers for the site and answers preflight", async () => {
+    const send = proxied();
+    const response = await send("/rpc/421614", post({ jsonrpc: "2.0", id: 1, method: "eth_chainId" }, { origin: "https://openhouse.anora.finance" }));
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://openhouse.anora.finance");
+    const preflight = await send("/rpc/421614", { method: "OPTIONS", headers: { origin: "https://openhouse.anora.finance" } });
+    expect(preflight.status).toBe(204);
+    const foreign = await send("/rpc/421614", post({ jsonrpc: "2.0", id: 1, method: "eth_chainId" }, { origin: "https://evil.example" }));
+    expect(foreign.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  test("limits proxy calls with the rpc budget and keeps other classes separate", async () => {
+    const limiter = createLimiter({ now: () => 0, rules: { rpc: { capacity: 2, perMinute: 2 }, read: { capacity: 5, perMinute: 5 } } });
+    const send = proxied({ limiter });
+    const rpcCall = () => send("/rpc/421614", post({ jsonrpc: "2.0", id: 1, method: "eth_chainId" }));
+    expect((await rpcCall()).status).toBe(200);
+    expect((await rpcCall()).status).toBe(200);
+    const blocked = await rpcCall();
+    expect(blocked.status).toBe(429);
+    expect((await json(blocked)).error.code).toBe("RATE_LIMITED");
+    expect((await send("/v1/activity?chainId=421614")).status).toBe(200);
+  });
+
+  test("is not served when no proxy is configured", async () => {
+    const response = await call("/rpc/421614", post({ jsonrpc: "2.0", id: 1, method: "eth_chainId" }));
+    expect(response.status).toBe(404);
+  });
+});
