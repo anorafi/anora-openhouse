@@ -141,5 +141,29 @@ The API limits each client with a token bucket per class of request. A client is
 | Sign in (`POST /v1/auth/*`) | nonce, verify | 10 |
 | Writes (other `POST`, `PUT /v1/uploads/*`) | metadata, approval, upload URLs, uploads | 20 |
 | Reads (`GET`) | everything except health | 240 |
+| JSON-RPC proxy (`/rpc/{chainId}`) | every proxied call | 600 |
 
 `GET /v1/health` and preflight requests are not limited. A request over budget gets HTTP 429 with the code `RATE_LIMITED`, a `Retry-After` header in seconds, and the usual CORS headers. A `POST` body over 64 KiB gets HTTP 413 with `PAYLOAD_TOO_LARGE`; file uploads are capped by the upload size limit instead. Buckets idle for ten minutes are dropped.
+
+## JSON-RPC proxy
+
+`POST /rpc/{chainId}` (421614 and 4663) forwards JSON-RPC from the browser to a node, so the site carries no provider key. The manifest points every network's `rpcUrl` at this endpoint and keeps the public node in `publicRpcUrl`. The indexer reads the manifest, keeps the provider host in `alchemyHost`, and takes the key from `ALCHEMY_API_KEY` in its environment (the unit starts through `secret with anora-openhouse --`). Upstreams per chain, in order: the keyed provider, then the public node. A 429, a 5xx, a timeout, a network error, or an answer that is not a matching batch moves on to the next upstream. When none answers, the reply is HTTP 503 and each call carries the error `RPC_UNAVAILABLE`.
+
+Both single calls and batches (up to 100 calls) are accepted. A batch reaches the upstream as one batch of the calls that are not already cached.
+
+Allowed methods: `eth_chainId`, `eth_blockNumber`, `eth_call`, `eth_getBalance`, `eth_getCode`, `eth_getLogs`, `eth_estimateGas`, `eth_gasPrice`, `eth_maxPriorityFeePerGas`, `eth_feeHistory`, `eth_getBlockByNumber`, `eth_getTransactionByHash`, `eth_getTransactionReceipt`, `eth_getTransactionCount`, `eth_sendRawTransaction`, `net_version`. Anything else gets the error `-32601`. `eth_getLogs` must name a block hash, or a numeric range of at most 10,000 blocks, or `latest` on both ends; anything else gets `-32602`.
+
+Caching and deduplication, per chain and per call with identical parameters:
+
+| Calls | Kept for |
+|---|---|
+| `eth_chainId`, `net_version`, `eth_getCode` | one hour |
+| `eth_call`, `eth_getBalance`, `eth_blockNumber`, gas and fee reads, `eth_estimateGas` | three seconds |
+| `eth_getLogs` | five seconds (one minute with a block hash) |
+| `eth_getBlockByNumber` | one minute for a numeric block, three seconds otherwise |
+| `eth_getTransactionByHash`, `eth_getTransactionReceipt` | one minute, only once the answer is not null |
+| `eth_sendRawTransaction`, `eth_getTransactionCount` | never cached and never shared |
+
+Identical calls that are in flight at the same time share one upstream request. Errors are never cached. A request body is limited to 256 KiB, and the proxy uses its own rate limit class (600 per minute per client). CORS is the same as for the rest of the API.
+
+The web app reads through this endpoint with JSON-RPC batching and one large multicall per read, and polls the chain and the indexer every fifteen seconds. Measured from one open Markets tab with seven facilities: about 20 requests per minute to the proxy and none to the provider, against roughly 2,300 requests per minute straight to the provider before.
