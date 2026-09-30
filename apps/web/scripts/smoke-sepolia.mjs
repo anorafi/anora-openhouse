@@ -27,7 +27,7 @@ const publicClient = createPublicClient({ chain: sepolia, transport });
 const wallets = {
   investor: privateKeyToAccount(process.env.DEMO_INVESTOR_PRIVATE_KEY),
   originator: privateKeyToAccount(process.env.DEMO_ORIGINATOR_PRIVATE_KEY),
-  risk: privateKeyToAccount(process.env.DEPLOYER_PRIVATE_KEY),
+  risk: privateKeyToAccount(process.env.RISK_AGENT_PRIVATE_KEY),
 };
 let current = wallets.originator;
 const sent = [];
