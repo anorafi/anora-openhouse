@@ -108,15 +108,17 @@ function RiskCard({ facility, isRiskAgent }: { facility: FacilityData; isRiskAge
         </div>
       )}
 
-      <div className="row">
-        <button
-          className="btn"
-          disabled={!canMarkLate || markLate.isPending || markLate.isConfirming}
-          onClick={() => markLate.writeContractAsync({ ...facilityCall, functionName: "markLate", args: [] })}
-        >
-          {markLate.isPending || markLate.isConfirming ? "Marking..." : "Mark late"}
-        </button>
-      </div>
+      {facility.statusName === "Open" && facility.principal > 0n && (
+        <div className="row">
+          <button
+            className="btn"
+            disabled={!canMarkLate || markLate.isPending || markLate.isConfirming}
+            onClick={() => markLate.writeContractAsync({ ...facilityCall, functionName: "markLate", args: [] })}
+          >
+            {markLate.isPending || markLate.isConfirming ? "Marking..." : "Mark late"}
+          </button>
+        </div>
+      )}
       {markLate.error && <p className="error">{describeContractError(markLate.error)}</p>}
       <TxLink hash={markLate.hash} />
 

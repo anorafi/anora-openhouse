@@ -715,3 +715,16 @@ progress::-moz-progress-bar { background: var(--fill); border-radius: 999px; }
 @media (max-width: 1100px) {
   .open-layout { grid-template-columns: 1fr; }
 }
+
+.risk-page { display: grid; gap: 20px; max-width: 760px; }
+.risk-page .card-list { display: grid; gap: 16px; }
+.risk-page .card { display: grid; gap: 12px; padding: 20px; background: var(--surface); border-radius: 18px; }
+.risk-page .card-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.risk-page .card-title { font-weight: 600; }
+.risk-page .row, .risk-page .form-block { display: flex; gap: 10px; align-items: flex-start; }
+.risk-page textarea, .risk-page input { padding: 10px 12px; border: 1px solid var(--line, #d9dce1); border-radius: 10px; font: inherit; }
+.risk-page .btn { padding: 10px 16px; border-radius: 10px; border: 0; background: #121720; color: #fff; font-weight: 600; cursor: pointer; }
+.risk-page .btn:disabled { opacity: .45; cursor: not-allowed; }
+.risk-page .btn-danger { background: #c53a3a; }
+.risk-page .error { color: #c53a3a; }
+.risk-page .muted { color: var(--muted); }
