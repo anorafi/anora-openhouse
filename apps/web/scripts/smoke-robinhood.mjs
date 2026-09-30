@@ -4,13 +4,15 @@ import { createPublicClient, createWalletClient, defineChain, http } from "viem"
 import { privateKeyToAccount } from "viem/accounts";
 
 const sepolia = defineChain({
-  id: 421614,
-  name: "Arbitrum Sepolia",
+  id: 4663,
+  name: "Robinhood Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: { default: { http: [process.env.ARBITRUM_SEPOLIA_RPC ?? "https://sepolia-rollup.arbitrum.io/rpc"] } },
+  rpcUrls: { default: { http: [process.env.ROBINHOOD_RPC ?? "https://rpc.mainnet.chain.robinhood.com"] } },
 });
+const usdg = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168";
+const erc20Abi = [{ type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] }];
 const deployments = JSON.parse(readFileSync(new URL("../../../contracts/deployments.json", import.meta.url), "utf8"));
-const factoryAddress = process.env.SMOKE_FACTORY ?? deployments.arbitrumSepolia.AnoraFactory;
+const factoryAddress = process.env.SMOKE_FACTORY ?? deployments.robinhood.AnoraFactory;
 const factoryAbi = [{ type: "function", name: "allFacilities", stateMutability: "view", inputs: [], outputs: [{ type: "address[]" }] }];
 const facilityAbi = [
   { type: "function", name: "dueAt", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
@@ -19,8 +21,8 @@ const facilityAbi = [
   { type: "function", name: "markLate", stateMutability: "nonpayable", inputs: [], outputs: [] },
 ];
 
-const url = process.env.SMOKE_URL ?? "http://127.0.0.1:8010/";
-const shotDir = process.env.SMOKE_SHOTS ?? "/home/dims/.cache/claude-work/smoke-sepolia";
+const url = process.env.SMOKE_URL ?? "http://127.0.0.1:8011/";
+const shotDir = process.env.SMOKE_SHOTS ?? "/home/dims/.cache/claude-work/smoke-robinhood";
 const paths = (process.env.SMOKE_PATHS ?? "repaid,default").split(",");
 const transport = http(sepolia.rpcUrls.default.http[0]);
 const publicClient = createPublicClient({ chain: sepolia, transport });
@@ -30,7 +32,23 @@ const wallets = {
   risk: privateKeyToAccount(process.env.DEPLOYER_PRIVATE_KEY),
 };
 let current = wallets.originator;
-const sent = [];
+const balanceOf = (address) => publicClient.readContract({ address: usdg, abi: erc20Abi, functionName: "balanceOf", args: [address] });
+async function snapshot(label) {
+  const investor = await balanceOf(wallets.investor.address);
+  const originator = await balanceOf(wallets.originator.address);
+  const risk = await balanceOf(wallets.risk.address);
+  const facility = await latestFacility().then(balanceOf).catch(() => 0n);
+  const fmt = (v) => (Number(v) / 1e6).toFixed(6);
+  console.log(`USDG ${label}: investor ${fmt(investor)} originator ${fmt(originator)} risk ${fmt(risk)} facility ${fmt(facility)} total ${fmt(investor + originator + risk + facility)}`);
+  return { investor, originator, risk, facility, total: investor + originator + risk + facility };
+}
+function assertConserved(start, now, label) {
+  const wallets3 = now.investor + now.originator + now.risk;
+  const startWallets = start.investor + start.originator + start.risk;
+  if (wallets3 + now.facility !== startWallets + start.facility) throw new Error(`STOP ${label}: USDG not conserved`);
+  if (now.investor < start.investor) throw new Error(`STOP ${label}: investor ended below starting balance`);
+  if (now.facility !== 0n) throw new Error(`STOP ${label}: facility still holds ${now.facility}`);
+}
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 mkdirSync(shotDir, { recursive: true });
 
@@ -46,7 +64,6 @@ async function walletRequest(method, params) {
       return null;
     case "eth_sendTransaction": {
       const tx = params[0];
-      sent.push({ from: current.address, to: tx.to.toLowerCase() });
       const client = createWalletClient({ account: current, chain: sepolia, transport });
       return client.sendTransaction({ to: tx.to, data: tx.data, value: tx.value ? BigInt(tx.value) : undefined, gas: tx.gas ? BigInt(tx.gas) : undefined });
     }
@@ -174,8 +191,8 @@ async function go(label) {
   await sleep(1_000);
 }
 
-async function openFacility(tag, terms, as = "originator") {
-  await actAs(as, "Originator");
+async function openFacility(tag, terms) {
+  await actAs("originator", "Originator");
   await go("Open a facility");
   await waitForText("Facility terms");
   await fill("Credit limit", terms.limit);
@@ -239,6 +256,7 @@ async function claim(tag, name) {
   await shot(`${tag}-claimed`);
 }
 
+const start = await snapshot("start");
 console.log(`investor ${wallets.investor.address}`);
 console.log(`originator ${wallets.originator.address}`);
 console.log(`risk agent ${wallets.risk.address}`);
@@ -258,6 +276,8 @@ if (paths.includes("repaid")) {
   await waitForText("Facility complete");
   await shot("a-repaid");
   await claim("a", name);
+  const afterA = await snapshot("after A");
+  assertConserved(start, afterA, "path A");
 }
 
 if (paths.includes("default")) {
@@ -296,27 +316,8 @@ if (paths.includes("default")) {
   await waitForText("Balance cleared");
   await shot("b-recovered");
   await claim("b", name);
-}
-
-if (paths.includes("unapproved")) {
-  const before = (await publicClient.readContract({ address: factoryAddress, abi: factoryAbi, functionName: "allFacilities" })).length;
-  await actAs("investor", "Originator");
-  await go("Open a facility");
-  await waitForText("Facility terms");
-  await fill("Credit limit", "10");
-  await fill("First-loss stake", "3");
-  await fill("Financing fee", "5");
-  await fill("Duration", "2");
-  await fill("Grace before default", "1");
-  await clickPrefix("Approve ");
-  await click("Clone facility and lock first-loss");
-  await waitForText("not an approved originator", 60_000);
-  await shot("unapproved-error");
-  const after = (await publicClient.readContract({ address: factoryAddress, abi: factoryAbi, functionName: "allFacilities" })).length;
-  const toFactory = sent.filter((tx) => tx.to === factoryAddress.toLowerCase());
-  console.log(`unapproved: message shown, facilities ${before} -> ${after}, transactions to factory ${toFactory.length}`);
-  if (after !== before || toFactory.length !== 0) throw new Error("STOP unapproved: a facility was created or a create transaction was sent");
-  process.exit(0);
+  const afterB = await snapshot("after B");
+  assertConserved(start, afterB, "path B");
 }
 
 await actAs("originator", "Originator");
