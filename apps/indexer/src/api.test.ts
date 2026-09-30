@@ -156,3 +156,37 @@ describe("cors", () => {
     expect(response.headers.get("access-control-allow-methods")).toContain("GET");
   });
 });
+
+describe("metadata routes", () => {
+  const delegating = () =>
+    createHandler({
+      db,
+      networks: [{ chainId: 421614, key: "arbitrum-sepolia", name: "Arbitrum Sepolia", confirmations: 2 }],
+      status,
+      maxLag: 50n,
+      now: () => NOW,
+      origins: ["https://openhouse.anora.finance"],
+      meta: async (request, url) => (url.pathname === "/v1/auth/nonce" ? new Response(JSON.stringify({ ok: request.method }), { status: 200, headers: { "content-type": "application/json" } }) : null),
+    });
+
+  test("hands matching requests to the metadata module and adds cors headers", async () => {
+    const response = await delegating()(new Request("http://127.0.0.1:8100/v1/auth/nonce", { method: "POST", headers: { origin: "https://openhouse.anora.finance" } }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: "POST" });
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://openhouse.anora.finance");
+  });
+
+  test("keeps other post requests rejected", async () => {
+    const response = await delegating()(new Request("http://127.0.0.1:8100/v1/health", { method: "POST" }));
+    expect(response.status).toBe(405);
+  });
+
+  test("allows post and the authorization header in preflight for approved origins only", async () => {
+    const approved = await delegating()(new Request("http://127.0.0.1:8100/v1/auth/nonce", { method: "OPTIONS", headers: { origin: "https://openhouse.anora.finance" } }));
+    expect(approved.headers.get("access-control-allow-methods")).toContain("POST");
+    expect(approved.headers.get("access-control-allow-headers")).toContain("authorization");
+    const foreign = await delegating()(new Request("http://127.0.0.1:8100/v1/auth/nonce", { method: "OPTIONS", headers: { origin: "https://evil.example" } }));
+    expect(foreign.headers.get("access-control-allow-origin")).toBeNull();
+  });
+});
+

@@ -1,10 +1,14 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Hex } from "viem";
 import { parseManifest } from "../../web/src/config/manifest";
 import { createHandler, type ChainStatus } from "./api";
 import { createChainClient } from "./client";
 import { openDb } from "./db";
+import { createChainReader, createRpcReaders } from "./meta/chain";
+import { createMetaRoutes } from "./meta/service";
+import { openMetaStore } from "./meta/store";
 import { syncChain, type ChainClient } from "./sync";
 
 const manifestPath = process.env.INDEXER_MANIFEST ?? new URL("../../web/public/manifest.json", import.meta.url).pathname;
@@ -15,6 +19,12 @@ const maxLag = BigInt(process.env.INDEXER_MAX_LAG ?? "400");
 const chunk = BigInt(process.env.INDEXER_CHUNK ?? "2000");
 const reorgWindow = BigInt(process.env.INDEXER_REORG_WINDOW ?? "128");
 const origins = (process.env.INDEXER_ORIGINS ?? "https://openhouse.anora.finance").split(",");
+const dataDir = dirname(dbPath);
+const metaDbPath = process.env.META_DB ?? `${dataDir}/metadata.db`;
+const documentsDir = process.env.META_DOCUMENTS ?? `${dataDir}/documents`;
+const secretPath = process.env.META_SECRET_FILE ?? `${dataDir}/meta.secret`;
+const metaDomain = process.env.META_DOMAIN ?? "openhouse.anora.finance";
+const maxFileBytes = Number(process.env.META_MAX_FILE_BYTES ?? String(5 * 1024 * 1024));
 
 const manifest = parseManifest(JSON.parse(readFileSync(manifestPath, "utf8")));
 const networks = manifest.networks.filter((network) => network.enabled);
@@ -51,13 +61,32 @@ async function loop(network: (typeof networks)[number]) {
   }
 }
 
+mkdirSync(documentsDir, { recursive: true });
+if (!existsSync(secretPath)) {
+  writeFileSync(secretPath, randomBytes(32).toString("hex"), { mode: 0o600 });
+  chmodSync(secretPath, 0o600);
+}
+const secret = new Uint8Array(Buffer.from(readFileSync(secretPath, "utf8").trim(), "hex"));
+const clock = () => Math.floor(Date.now() / 1000);
+
+const meta = createMetaRoutes({
+  store: openMetaStore(metaDbPath),
+  chain: createChainReader(createRpcReaders(networks)),
+  db,
+  auth: { domain: metaDomain, chains: networks.map((network) => network.chainId), now: clock, nonceTtl: 300, sessionTtl: 3600 },
+  secret,
+  documentsDir,
+  maxFileBytes,
+});
+
 const handler = createHandler({
   db,
   networks: networks.map((network) => ({ chainId: network.chainId, key: network.key, name: network.name, confirmations: network.confirmations })),
   status,
   maxLag,
-  now: () => Math.floor(Date.now() / 1000),
+  now: clock,
   origins,
+  meta,
 });
 
 Bun.serve({ port, hostname: "127.0.0.1", fetch: handler });

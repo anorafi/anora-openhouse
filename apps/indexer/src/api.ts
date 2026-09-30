@@ -21,6 +21,7 @@ export interface ApiDeps {
   maxLag: bigint;
   now: () => number;
   origins: string[];
+  meta?: (request: Request, url: URL) => Promise<Response | null>;
 }
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -172,10 +173,17 @@ export function createHandler(deps: ApiDeps) {
     const cors: Record<string, string> = { vary: "Origin" };
     if (origin) {
       cors["access-control-allow-origin"] = origin;
-      cors["access-control-allow-methods"] = "GET, OPTIONS";
-      cors["access-control-allow-headers"] = "content-type";
+      cors["access-control-allow-methods"] = "GET, POST, PUT, OPTIONS";
+      cors["access-control-allow-headers"] = "content-type, authorization";
     }
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+    if (deps.meta) {
+      const handled = await deps.meta(request, new URL(request.url));
+      if (handled) {
+        for (const [name, value] of Object.entries(cors)) handled.headers.set(name, value);
+        return handled;
+      }
+    }
     if (request.method !== "GET") return send({ error: { code: "METHOD_NOT_ALLOWED", message: "Only GET is supported." } }, 405, cors);
     try {
       return send(route(deps, new URL(request.url)), 200, cors);
