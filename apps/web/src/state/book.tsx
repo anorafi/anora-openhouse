@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { useQueryClient } from "@tanstack/react-query";
 import type { Address } from "viem";
 import { useAccount, useChainId, useConfig, useWriteContract } from "wagmi";
-import { readContract, waitForTransactionReceipt } from "wagmi/actions";
+import { readContract, simulateContract, waitForTransactionReceipt } from "wagmi/actions";
 import type { Market, MarketStatus } from "../components/Markets";
 import { assetContract, facilityContract, factoryContract } from "../config/contracts";
 import { useAssetBalance } from "../hooks/useAsset";
@@ -13,6 +13,7 @@ import { useHistory } from "../hooks/useHistory";
 import { useMyPositions } from "../hooks/usePositions";
 import { fromUnits, fundingState, marketAction, toFacility, toUnits, type Facility, type Stage } from "../lib/book";
 import { encodeFacilityName, type Listing } from "../lib/facilityName";
+import { guardedWrite } from "../lib/guardedWrite";
 import { depositedBy, eventsFrom, totalsFrom, type BookEvent } from "../lib/history";
 
 export type { Facility, Stage } from "../lib/book";
@@ -118,11 +119,15 @@ export function BookProvider({ children }: { children: ReactNode }) {
   }, [raw]);
 
   const send = useCallback(async (request: Parameters<typeof writeContractAsync>[0]) => {
-    const hash = await writeContractAsync(request);
+    const hash = await guardedWrite(
+      (pending) => simulateContract(config, { ...pending, account: me } as never),
+      writeContractAsync,
+      request,
+    );
     const receipt = await waitForTransactionReceipt(config, { hash, chainId });
     if (receipt.status !== "success") throw new Error("Transaction reverted.");
     await queryClient.invalidateQueries();
-  }, [chainId, config, queryClient, writeContractAsync]);
+  }, [chainId, config, me, queryClient, writeContractAsync]);
 
   const approveUnits = useCallback(async (spender: Address, amount: bigint) => {
     if (!deployment || !me) throw new Error("Connect a wallet first.");
