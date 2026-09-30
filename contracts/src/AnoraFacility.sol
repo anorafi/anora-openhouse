@@ -290,7 +290,7 @@ contract AnoraFacility is Initializable, ReentrancyGuard, IRiskAgentSource {
 
     function _distributeFee(uint256 amount) internal {
         if (amount == 0) return;
-        uint256 toSenior = amount * terms.seniorFeeShareBps / BPS;
+        uint256 toSenior = juniorTotalShares == 0 ? amount : amount * terms.seniorFeeShareBps / BPS;
         seniorAssets += toSenior;
         juniorAssets += amount - toSenior;
     }
