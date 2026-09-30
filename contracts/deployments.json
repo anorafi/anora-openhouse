@@ -15,17 +15,17 @@
   },
   "robinhood": {
     "chainId": 4663,
-    "deployedAt": "2026-09-20",
+    "deployedAt": "2026-09-30",
     "rpc": "https://rpc.mainnet.chain.robinhood.com",
     "explorer": "https://robinhoodchain.blockscout.com",
     "asset": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
     "assetSymbol": "USDG",
     "faucet": false,
-    "AnoraFactory": "0x9a01C5E22602E565d39067454dD70c38D063D328",
-    "AnoraFacilityImplementation": "0x8695a1C6AD462DFc7a6cb7980dB99D9Eb1c26F6f",
+    "AnoraFactory": "0xF358cf972a2Bd68f061662Fb28021b3d01579f86",
+    "AnoraFacilityImplementation": "0xD85b58564d9f777e3f41af191F5C4348c58D7493",
     "initialRiskAgent": "0x07dF8cd6D20b71ba7F16309d2844B88d1043fFfB",
     "minFirstLossBps": 1000,
-    "note": "commit 055a7cd with zero-address checks",
-    "previousFactory": "0x9300dbB89FC8a64dcD61511c9d17f5B5eF3E039b"
+    "note": "commit b5ab134 with term validation and post-due drawdown guard",
+    "previousFactory": "0x9a01C5E22602E565d39067454dD70c38D063D328"
   }
 }
