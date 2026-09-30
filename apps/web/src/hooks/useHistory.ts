@@ -3,12 +3,8 @@ import { decodeEventLog, type Address, type Hex } from "viem";
 import { useChainId } from "wagmi";
 import { AnoraFacilityAbi, AnoraFactoryAbi } from "../abi";
 import type { ChainLog } from "../lib/history";
-import { useFactoryAddress } from "./useDeployment";
+import { useDeployment } from "./useDeployment";
 
-const BLOCKSCOUT_API: Record<number, string> = {
-  4663: "https://robinhoodchain.blockscout.com/api/v2",
-  421614: "https://arbitrum-sepolia.blockscout.com/api/v2",
-};
 const MAX_PAGES = 5;
 const EVENT_ABI = [...AnoraFacilityAbi, ...AnoraFactoryAbi].filter((item) => item.type === "event");
 
@@ -56,15 +52,16 @@ function decode(item: BlockscoutLog): ChainLog | null {
 
 export function useHistory(facilities: readonly Address[]) {
   const chainId = useChainId();
-  const factory = useFactoryAddress();
-  const api = BLOCKSCOUT_API[chainId];
+  const deployment = useDeployment();
+  const factory = deployment?.factory;
+  const api = deployment?.logsApi;
 
   return useQuery({
     queryKey: ["history", chainId, factory, facilities.join(",")],
     enabled: !!api && !!factory,
     refetchInterval: 10_000,
     queryFn: async () => {
-      const pages = await Promise.all([factory!, ...facilities].map((address) => fetchLogs(api, address).catch(() => [])));
+      const pages = await Promise.all([factory!, ...facilities].map((address) => fetchLogs(api!, address).catch(() => [])));
       return pages.flat().map(decode).filter((log): log is ChainLog => log !== null);
     },
   });

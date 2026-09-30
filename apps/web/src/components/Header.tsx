@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
-import { arbitrumSepolia } from "wagmi/chains";
-import { robinhood } from "../config/wagmi";
+import { orderedNetworks } from "../config/chains";
+import { useManifest } from "../config/ManifestContext";
 import { useIsRiskAgent } from "../hooks/useFactory";
 import { shortenAddress } from "../lib/format";
-
-const SELECTABLE_CHAINS = [{ id: robinhood.id, name: "Robinhood Chain" }, { id: arbitrumSepolia.id, name: "Arbitrum Sepolia" }];
 
 /** Close an open popover when the next click lands outside it. */
 function useDismiss(open: boolean, setOpen: (open: boolean) => void) {
@@ -36,7 +34,9 @@ export function Header() {
   const { disconnect } = useDisconnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const isRiskAgent = useIsRiskAgent(address);
-  const currentChain = SELECTABLE_CHAINS.find((chain) => chain.id === chainId);
+  const manifest = useManifest();
+  const selectableChains = orderedNetworks(manifest).map((network) => ({ id: network.chainId, name: network.name }));
+  const currentChain = selectableChains.find((chain) => chain.id === chainId);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useDismiss(menuOpen, setMenuOpen);
 
@@ -53,7 +53,7 @@ export function Header() {
           </button>
           {menuOpen && (
             <div className="network-menu" role="menu">
-              {SELECTABLE_CHAINS.filter((chain) => chain.id !== chainId).map((chain) => (
+              {selectableChains.filter((chain) => chain.id !== chainId).map((chain) => (
                 <button
                   key={chain.id}
                   role="menuitem"

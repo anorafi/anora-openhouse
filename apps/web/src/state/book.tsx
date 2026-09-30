@@ -11,7 +11,7 @@ import { useAllFacilityAddresses } from "../hooks/useFactory";
 import { useFacilities, type FacilityData } from "../hooks/useFacilities";
 import { useHistory } from "../hooks/useHistory";
 import { useMyPositions } from "../hooks/usePositions";
-import { fromUnits, fundingState, marketAction, toFacility, toUnits, type Facility, type Stage } from "../lib/book";
+import { draftSizeFor, fromUnits, fundingState, marketAction, toFacility, toUnits, type DraftSize, type Facility, type Stage } from "../lib/book";
 import { encodeFacilityName, type Listing } from "../lib/facilityName";
 import { guardedWrite } from "../lib/guardedWrite";
 import { depositedBy, eventsFrom, totalsFrom, type BookEvent } from "../lib/history";
@@ -119,15 +119,16 @@ export function BookProvider({ children }: { children: ReactNode }) {
   }, [raw]);
 
   const send = useCallback(async (request: Parameters<typeof writeContractAsync>[0]) => {
+    if (!deployment?.writes) throw new Error("Transactions are disabled on this network.");
     const hash = await guardedWrite(
       (pending) => simulateContract(config, { ...pending, account: me } as never),
       writeContractAsync,
       request,
     );
-    const receipt = await waitForTransactionReceipt(config, { hash, chainId });
+    const receipt = await waitForTransactionReceipt(config, { hash, chainId, confirmations: deployment.confirmations });
     if (receipt.status !== "success") throw new Error("Transaction reverted.");
     await queryClient.invalidateQueries();
-  }, [chainId, config, me, queryClient, writeContractAsync]);
+  }, [chainId, config, deployment, me, queryClient, writeContractAsync]);
 
   const approveUnits = useCallback(async (spender: Address, amount: bigint) => {
     if (!deployment || !me) throw new Error("Connect a wallet first.");
@@ -300,15 +301,8 @@ const FACILITY_POOL: PoolEntry[] = [
   { name: "Yangon Pulses Export", company: "Ayeyarwady Agri Co., Ltd.", route: "Myanmar → India", type: "Commodity finance", icon: "◎" },
 ];
 
-export interface DraftSize { min: number; max: number; step: number }
-
-const DRAFT_SIZE: Record<number, DraftSize> = {
-  4663: { min: 10, max: 20, step: 1 },
-  421614: { min: 150_000, max: 600_000, step: 10_000 },
-};
-
 export function useDraftSize(): DraftSize {
-  return DRAFT_SIZE[useChainId()] ?? DRAFT_SIZE[421614];
+  return draftSizeFor(useDeployment()?.faucet ?? true);
 }
 
 const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FacilityData } from "../hooks/useFacilities";
-import { durationText, fromUnits, fundingState, marketAction, realizedReturn, stageOf, toFacility, toUnits, waterfallOf, type Facility } from "./book";
+import { draftSizeFor, durationText, fromUnits, fundingState, marketAction, realizedReturn, stageOf, toFacility, toUnits, waterfallOf, type Facility } from "./book";
 import { encodeFacilityName } from "./facilityName";
 
 const U = 1_000_000n;
@@ -176,5 +176,15 @@ describe("provider view of a facility", () => {
     expect(realizedReturn({ ...held, stage: "defaulted" })).toBe(0);
     expect(realizedReturn({ ...held, stage: "repaid" })).toBeCloseTo(0.09);
     expect(realizedReturn({ ...held, stage: "recovered", holding: { ...held.holding, value: 1 } })).toBe(-2);
+  });
+});
+
+describe("draftSizeFor", () => {
+  it("uses testnet-scale drafts for an asset with a faucet", () => {
+    expect(draftSizeFor(true)).toEqual({ min: 150_000, max: 600_000, step: 10_000 });
+  });
+
+  it("keeps drafts small when the asset is real money", () => {
+    expect(draftSizeFor(false)).toEqual({ min: 10, max: 20, step: 1 });
   });
 });
