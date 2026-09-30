@@ -5,13 +5,13 @@
     "asset": "0x38513243bA873d05b8b1E6622fE12e7685E4eAc6",
     "assetSymbol": "TestUSDC",
     "faucet": true,
-    "AnoraFactory": "0xB3Cd0c4c1c32D3d15Dde073d7BAC3529C70b8d0b",
-    "AnoraFacilityImplementation": "0x68Ad038f506cC55478BdbDD80ab07bc528b6d78a",
+    "AnoraFactory": "0x9F356D8eEf33a04F2F0628B80441D3Ed8Ebd4B52",
+    "AnoraFacilityImplementation": "0x5Ecc49dAD8AC9d00C13Ec8D48A9880e468DbEC54",
     "initialRiskAgent": "0x07dF8cd6D20b71ba7F16309d2844B88d1043fFfB",
     "minFirstLossBps": 1000,
     "explorer": "https://sepolia.arbiscan.io",
-    "note": "commit b5ab134 with term validation and post-due drawdown guard",
-    "previousFactory": "0xDD4977E7D6249d0c5035Ed55DB1c710Fec4E9707"
+    "note": "commit 375c02f with fee fix for Senior-only facilities and approved originators",
+    "previousFactory": "0xB3Cd0c4c1c32D3d15Dde073d7BAC3529C70b8d0b"
   },
   "robinhood": {
     "chainId": 4663,
@@ -21,11 +21,11 @@
     "asset": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
     "assetSymbol": "USDG",
     "faucet": false,
-    "AnoraFactory": "0xF358cf972a2Bd68f061662Fb28021b3d01579f86",
-    "AnoraFacilityImplementation": "0xD85b58564d9f777e3f41af191F5C4348c58D7493",
+    "AnoraFactory": "0x6CcDaf026fB01d0138570a87D9D226Dd9f6B6155",
+    "AnoraFacilityImplementation": "0x9ba982307554A0c34F35eCEe79eCA5DE872f3A12",
     "initialRiskAgent": "0x07dF8cd6D20b71ba7F16309d2844B88d1043fFfB",
     "minFirstLossBps": 1000,
-    "note": "commit b5ab134 with term validation and post-due drawdown guard",
-    "previousFactory": "0x9a01C5E22602E565d39067454dD70c38D063D328"
+    "note": "commit 375c02f with fee fix for Senior-only facilities and approved originators",
+    "previousFactory": "0xF358cf972a2Bd68f061662Fb28021b3d01579f86"
   }
 }
