@@ -61,6 +61,67 @@ The body is `{ "error": { "code", "message" } }`.
 
 The web app shows these as a banner and never substitutes other data. When the indexer cannot be reached at all the banner reads "Could not reach the indexer".
 
+## Metadata, underwriting, and documents
+
+The same process serves a metadata service. It keeps its own SQLite file (`metadata.db`), uploaded files under `documents/`, and a random signing secret in `meta.secret` (mode 600), all next to the index in `~/.local/share/anora-indexer/`. Set `META_DOMAIN`, `META_MAX_FILE_BYTES` (default 5 MiB), `META_DB`, `META_DOCUMENTS`, and `META_SECRET_FILE` to override.
+
+Roles come from the chain, not from the service: the originator is `facility.originator()` and the reviewer is `facility.riskAgent()` (the factory's risk agent). Revoking an originator at the factory does not stop them managing metadata for facilities they already opened.
+
+### Sign in
+
+| Route | Purpose |
+|---|---|
+| `POST /v1/auth/nonce` `{address, chainId}` | returns a single-use nonce (5 minutes) and the EIP-4361 message to sign, bound to `META_DOMAIN` |
+| `POST /v1/auth/verify` `{message, signature}` | checks the signature, consumes the nonce, returns a random bearer `token` valid for 1 hour |
+
+Send the token as `Authorization: Bearer <token>`. The service sets no cookies.
+
+### Records
+
+| Route | Who | Effect |
+|---|---|---|
+| `POST /v1/facilities/{chainId}/{address}/metadata/versions` | originator | adds an immutable draft version: `company`, `route`, `financingType` and optional `operatingHistoryYears`, `verifiedAssets`, `buyerConcentrationPct`, `documentCoverage` |
+| `POST .../underwriting/approve` `{version, grade, note}` | reviewer | adds an immutable approval for a draft. The canonical JSON (sorted keys, no whitespace) is stored with `digest = keccak256(canonical JSON)` |
+| `GET .../metadata` | anyone | latest approval, its digest, and `anchored` |
+
+`anchored` is true only when the facility's onchain `evidenceHash` equals the latest approval's digest. To anchor, the originator calls `attachEvidence(digest)` on the facility. A newer approval has a new digest, so it reads `anchored: false` until it is anchored again. Older drafts and approvals are never edited or deleted.
+
+### Documents
+
+| Route | Who | Effect |
+|---|---|---|
+| `POST .../documents/upload-url` `{name, mime, size, visibility}` | originator | reserves a slot and returns a 5 minute signed `uploadUrl`. Types: `application/pdf`, `image/png`, `image/jpeg`. `visibility` is `public` or `restricted` |
+| `PUT /v1/uploads/{id}?exp=&sig=` (body: the file) | link holder | stores the file once; size and magic bytes must match; records `sha256` and the next manifest version |
+| `GET .../documents` | anyone | the versioned manifest. `url` is a 5 minute signed link, or `null` for a restricted document the reader may not open |
+| `GET /v1/downloads/{id}?exp=&sig=` | link holder | the file |
+
+Restricted documents open for the originator, the reviewer, and any signed-in wallet with a `Deposited` event on that facility.
+
+### Metadata errors
+
+| Code | Status | When |
+|---|---|---|
+| `UNAUTHENTICATED` | 401 | missing, unknown, or expired session |
+| `INVALID_NONCE`, `INVALID_DOMAIN`, `INVALID_SIGNATURE` | 401 | sign-in checks failed |
+| `FORBIDDEN` | 403 | wrong role for the facility |
+| `INVALID_SIGNATURE` | 403 | upload or download link tampered with or expired |
+| `METADATA_NOT_FOUND` | 404 | no approved record yet |
+| `VERSION_NOT_FOUND` | 404 | approving a draft that does not exist |
+| `UNSUPPORTED_TYPE`, `SIZE_MISMATCH`, `TYPE_MISMATCH` | 400 | file rejected |
+| `PAYLOAD_TOO_LARGE` | 413 | file or body over the limit |
+| `ALREADY_STORED` | 409 | the upload slot was already used |
+| `METADATA_UNAVAILABLE` | 503 | the facility could not be read from the chain |
+
+The web app shows `METADATA_UNAVAILABLE` in the modal and does not fall back to sample figures. Sample figures appear only when there is no approved record, and are labelled as such.
+
+### Seeding sample records
+
+```bash
+secret with anora-openhouse -- bun run apps/indexer/scripts/seed-metadata.ts
+```
+
+Signs in as the demo originator and the risk agent, adds a draft, approves it, anchors the digest with `attachEvidence` on Arbitrum Sepolia, and uploads one public and one restricted sample document to the first facility. `SEED_FACILITIES` (comma separated) picks facilities, `SEED_SKIP_ANCHOR` leaves some unanchored, `SEED_API` points at another server.
+
 ## Reset
 
 ```bash
