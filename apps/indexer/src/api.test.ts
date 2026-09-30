@@ -90,7 +90,7 @@ describe("positions", () => {
   test("returns the wallet positions with their source block", async () => {
     const body = await json(await call(`/v1/accounts/${PROVIDER}/positions?chainId=421614`));
     expect(body.items).toHaveLength(1);
-    expect(body.items[0]).toMatchObject({ facility: FACILITY.toLowerCase(), status: "HELD", senior: { assets: "6000000", shares: "6000000" } });
+    expect(body.items[0]).toMatchObject({ facility: FACILITY.toLowerCase(), status: "HELD", senior: { deposited: "6000000", withdrawn: "0", shares: "6000000" } });
   });
 });
 

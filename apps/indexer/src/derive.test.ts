@@ -65,6 +65,22 @@ describe("deriveFacility", () => {
     expect(f.repaid).toEqual({ principal: "6000000", fee: "300000" });
   });
 
+  test("keeps deposits as supplied capital and reports withdrawals separately", () => {
+    block = 0;
+    const withdrawn = ev("Withdrawn", { provider: PROVIDER, tranche: 0, assets: 6_300_000n, shares: 6_000_000n });
+    const f = deriveFacility([created(), deposit(), draw(), repaid(), closed(), withdrawn], NOW)!;
+    expect(f.deposited).toEqual({ senior: "6000000", junior: "0" });
+    expect(f.withdrawn).toEqual({ senior: "6300000", junior: "0" });
+  });
+
+  test("has no outstanding principal once a default is declared because the loss takes its place", () => {
+    block = 0;
+    const f = deriveFacility([created(), deposit(), draw(NOW - 20), late(), defaulted()], NOW)!;
+    expect(f.status).toBe("DEFAULTED");
+    expect(f.outstandingPrincipal).toBe("0");
+    expect(f.outstandingLoss).toBe("6000000");
+  });
+
   test("is DEFAULTED with the loss outstanding, then RECOVERED once the loss is cleared", () => {
     block = 0;
     const base = [created(), deposit(), draw(NOW - 20), late(), defaulted()];
@@ -89,7 +105,7 @@ describe("derivePositions", () => {
     const positions = derivePositions(events, PROVIDER, NOW);
     expect(positions).toHaveLength(1);
     expect(positions[0].facility).toBe(FACILITY.toLowerCase());
-    expect(positions[0].senior).toEqual({ assets: "6000000", shares: "6000000" });
+    expect(positions[0].senior).toEqual({ deposited: "6000000", withdrawn: "0", shares: "6000000" });
     expect(positions[0].status).toBe("CLAIMABLE");
     expect(positions[0].sourceBlock).toBe(String(block));
   });
@@ -102,7 +118,7 @@ describe("derivePositions", () => {
     const withdrawn = ev("Withdrawn", { provider: PROVIDER, tranche: 0, assets: 6_300_000n, shares: 6_000_000n });
     const settled = derivePositions([created(), deposit(), draw(), repaid(), closed(), withdrawn], PROVIDER, NOW);
     expect(settled[0].status).toBe("SETTLED");
-    expect(settled[0].senior.shares).toBe("0");
+    expect(settled[0].senior).toEqual({ deposited: "6000000", withdrawn: "6300000", shares: "0" });
   });
 
   test("ignores other accounts", () => {

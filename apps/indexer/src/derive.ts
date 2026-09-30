@@ -15,6 +15,7 @@ export interface FacilitySummary {
   closed: boolean;
   dueAt: string | null;
   deposited: { senior: string; junior: string };
+  withdrawn: { senior: string; junior: string };
   outstandingPrincipal: string;
   outstandingLoss: string;
   repaid: { principal: string; fee: string };
@@ -23,7 +24,8 @@ export interface FacilitySummary {
 }
 
 export interface TranchePosition {
-  assets: string;
+  deposited: string;
+  withdrawn: string;
   shares: string;
 }
 
@@ -45,6 +47,8 @@ export function deriveFacility(events: IndexedEvent[], nowSeconds: number): Faci
   if (!created) return null;
   let senior = 0n;
   let junior = 0n;
+  let outSenior = 0n;
+  let outJunior = 0n;
   let drawn = 0n;
   let repaidPrincipal = 0n;
   let repaidFee = 0n;
@@ -62,8 +66,8 @@ export function deriveFacility(events: IndexedEvent[], nowSeconds: number): Faci
       if (d.tranche === "SENIOR") senior += big(d.assets);
       else junior += big(d.assets);
     } else if (e.event === "Withdrawn") {
-      if (d.tranche === "SENIOR") senior -= big(d.assets);
-      else junior -= big(d.assets);
+      if (d.tranche === "SENIOR") outSenior += big(d.assets);
+      else outJunior += big(d.assets);
     } else if (e.event === "Drawn") {
       drawn += big(d.amount);
       dueAt = big(d.dueAt);
@@ -77,7 +81,7 @@ export function deriveFacility(events: IndexedEvent[], nowSeconds: number): Faci
     } else if (e.event === "Recovered") recovered += big(d.amount);
     else if (e.event === "FacilityClosed") closed = true;
   }
-  const outstandingPrincipal = drawn - repaidPrincipal;
+  const outstandingPrincipal = defaulted ? 0n : drawn - repaidPrincipal;
   const outstandingLoss = totalLoss > recovered ? totalLoss - recovered : 0n;
   let status: FacilityStatus;
   if (defaulted) status = outstandingLoss === 0n ? "RECOVERED" : "DEFAULTED";
@@ -99,6 +103,7 @@ export function deriveFacility(events: IndexedEvent[], nowSeconds: number): Faci
     closed,
     dueAt: dueAt === null ? null : dueAt.toString(),
     deposited: { senior: senior.toString(), junior: junior.toString() },
+    withdrawn: { senior: outSenior.toString(), junior: outJunior.toString() },
     outstandingPrincipal: outstandingPrincipal.toString(),
     outstandingLoss: outstandingLoss.toString(),
     repaid: { principal: repaidPrincipal.toString(), fee: repaidFee.toString() },
@@ -119,13 +124,17 @@ export function derivePositions(events: IndexedEvent[], account: string, nowSeco
   for (const [facility, list] of byFacility) {
     const mine = list.filter((e) => (e.event === "Deposited" || e.event === "Withdrawn") && e.data.provider === wanted);
     if (mine.length === 0) continue;
-    const senior = { assets: 0n, shares: 0n };
-    const junior = { assets: 0n, shares: 0n };
+    const senior = { deposited: 0n, withdrawn: 0n, shares: 0n };
+    const junior = { deposited: 0n, withdrawn: 0n, shares: 0n };
     for (const e of mine) {
       const target = e.data.tranche === "SENIOR" ? senior : junior;
-      const sign = e.event === "Deposited" ? 1n : -1n;
-      target.assets += sign * big(e.data.assets);
-      target.shares += sign * big(e.data.shares);
+      if (e.event === "Deposited") {
+        target.deposited += big(e.data.assets);
+        target.shares += big(e.data.shares);
+      } else {
+        target.withdrawn += big(e.data.assets);
+        target.shares -= big(e.data.shares);
+      }
     }
     const summary = deriveFacility(list, nowSeconds);
     const held = senior.shares + junior.shares;
@@ -135,8 +144,8 @@ export function derivePositions(events: IndexedEvent[], account: string, nowSeco
     out.push({
       chainId: mine[0].chainId,
       facility,
-      senior: { assets: senior.assets.toString(), shares: senior.shares.toString() },
-      junior: { assets: junior.assets.toString(), shares: junior.shares.toString() },
+      senior: { deposited: senior.deposited.toString(), withdrawn: senior.withdrawn.toString(), shares: senior.shares.toString() },
+      junior: { deposited: junior.deposited.toString(), withdrawn: junior.withdrawn.toString(), shares: junior.shares.toString() },
       status,
       sourceBlock: [...list].sort(order).slice(-1)[0].blockNumber,
     });
