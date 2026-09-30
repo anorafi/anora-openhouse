@@ -13,6 +13,7 @@
     "build:web": "bun run --filter @anora/web build",
     "test:web": "bun run --filter @anora/web test",
     "test:keeper": "cd apps/keeper && bun test",
-    "keeper": "bun run apps/keeper/src/index.ts"
+    "keeper": "bun run apps/keeper/src/index.ts",
+    "manifest": "bun run --filter @anora/web manifest"
   }
 }
