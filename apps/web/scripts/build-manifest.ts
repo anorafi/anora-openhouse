@@ -16,7 +16,10 @@ interface ChainMeta {
   multicall3?: Address;
   alchemyHost?: string;
   logsApi: string;
+  indexerApi?: string;
 }
+
+const INDEXER_API = process.env.INDEXER_API ?? "https://anora-api.dimsky.xyz";
 
 const META: Record<string, ChainMeta> = {
   arbitrumSepolia: {
@@ -26,6 +29,7 @@ const META: Record<string, ChainMeta> = {
     confirmations: 2,
     alchemyHost: "arb-sepolia",
     logsApi: "https://arbitrum-sepolia.blockscout.com/api/v2",
+    indexerApi: INDEXER_API,
   },
   robinhood: {
     key: "robinhood",
@@ -35,6 +39,7 @@ const META: Record<string, ChainMeta> = {
     multicall3: "0xcA11bde05977b3631167028862bE2a173976CA11",
     alchemyHost: "robinhood-mainnet",
     logsApi: "https://robinhoodchain.blockscout.com/api/v2",
+    indexerApi: INDEXER_API,
   },
 };
 
@@ -96,6 +101,7 @@ async function buildNetwork(key: string, entry: RawDeployment) {
     ...(meta.multicall3 ? { multicall3: meta.multicall3 } : {}),
     ...(meta.alchemyHost ? { alchemyHost: meta.alchemyHost } : {}),
     logsApi: meta.logsApi,
+    ...(meta.indexerApi ? { indexerApi: meta.indexerApi } : {}),
     asset: { address: entry.asset as Address, symbol: entry.assetSymbol, decimals: assetDecimals, faucet: entry.faucet },
     contracts: { factory, facilityImplementation: entry.AnoraFacilityImplementation as Address },
     deploymentBlock: block.toString(),

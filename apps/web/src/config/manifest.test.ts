@@ -100,6 +100,13 @@ describe("parseManifest", () => {
     expect(() => parseManifest(manifest({ networks: [network({ logsApi: "nope" })] }))).toThrow(/logsApi/);
   });
 
+  it("accepts an optional indexer api, carries it into the deployment, and rejects a malformed one", () => {
+    const parsed = parseManifest(manifest({ networks: [network({ indexerApi: "https://anora-api.dimsky.xyz" })] }));
+    expect(parsed.networks[0].indexerApi).toBe("https://anora-api.dimsky.xyz");
+    expect(deploymentOf(parsed.networks[0]).indexerApi).toBe("https://anora-api.dimsky.xyz");
+    expect(() => parseManifest(manifest({ networks: [network({ indexerApi: "nope" })] }))).toThrow(/indexerApi/);
+  });
+
   it("rejects a non-https rpc url", () => {
     expect(() => parseManifest(manifest({ networks: [network({ rpcUrl: "ftp://x" })] }))).toThrow(/rpcUrl/);
   });
@@ -141,6 +148,7 @@ describe("deploymentOf", () => {
       writes: true,
       deploymentBlock: 19434064n,
       logsApi: undefined,
+      indexerApi: undefined,
     });
     expect(deploymentOf(parseManifest(manifest({ networks: [network({ logsApi: "https://explorer.example/api/v2" })] })).networks[0]).logsApi).toBe("https://explorer.example/api/v2");
   });
