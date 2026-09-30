@@ -43,10 +43,14 @@ async function upload(token: string, path: string, name: string, visibility: "pu
   return stored;
 }
 
-const facilities: string[] = ((await call(`/v1/facilities?chainId=${chainId}`)).items as { address: string; originator: string }[])
-  .filter((item) => item.originator.toLowerCase() === originator.address.toLowerCase())
-  .map((item) => item.address)
-  .slice(0, SAMPLES.length);
+const listed = (name: string) => (process.env[name] ?? "").split(",").map((entry) => entry.trim().toLowerCase()).filter(Boolean);
+const withoutAnchor = new Set(listed("SEED_SKIP_ANCHOR"));
+const facilities: string[] = listed("SEED_FACILITIES").length
+  ? listed("SEED_FACILITIES")
+  : ((await call(`/v1/facilities?chainId=${chainId}`)).items as { address: string; originator: string }[])
+      .filter((item) => item.originator.toLowerCase() === originator.address.toLowerCase())
+      .map((item) => item.address)
+      .slice(0, SAMPLES.length);
 
 const originatorToken = await login(originator);
 const reviewerToken = await login(reviewer);
@@ -55,8 +59,12 @@ for (const [index, facility] of facilities.entries()) {
   const path = `/v1/facilities/${chainId}/${facility}`;
   const draft = await post(`${path}/metadata/versions`, originatorToken, SAMPLES[index]);
   const approval = await post(`${path}/underwriting/approve`, reviewerToken, { version: draft.version, grade: index === 0 ? "A" : "B+", note: "Sample review for the Arbitrum Sepolia demo." });
-  const hash = await wallet.writeContract({ address: facility as Hex, abi: AnoraFacilityAbi, functionName: "attachEvidence", args: [approval.digest as Hex] });
-  await publicClient.waitForTransactionReceipt({ hash });
+  let hash: Hex | null = null;
+  if (!withoutAnchor.has(facility.toLowerCase())) {
+    hash = await wallet.writeContract({ address: facility as Hex, abi: AnoraFacilityAbi, functionName: "attachEvidence", args: [approval.digest as Hex] });
+    await publicClient.waitForTransactionReceipt({ hash });
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
   if (index === 0) {
     await upload(originatorToken, path, "invoice-sample.pdf", "public");
     await upload(originatorToken, path, "buyer-contract-sample.pdf", "restricted");
