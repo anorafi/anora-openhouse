@@ -31,6 +31,11 @@ describe("chainOf", () => {
     expect(chain.contracts).toBeUndefined();
   });
 
+  it("gives wagmi a multicall3 contract to batch reads with", () => {
+    const chain = chainOf(network({ multicall3: address(7) as `0x${string}` }));
+    expect(chain.contracts?.multicall3).toEqual({ address: address(7) });
+  });
+
   it("registers multicall3 when the manifest provides it", () => {
     const chain = chainOf(network({ multicall3: address(7) as `0x${string}` }));
     expect(chain.contracts?.multicall3?.address).toBe(address(7));

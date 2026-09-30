@@ -60,8 +60,17 @@ async function walletRequest(method, params) {
 const { page } = await getWindow(process.env.VBROWSER_AGENT ?? "smoke");
 await page.setViewport({ width: 1440, height: 900 });
 await page.emulateTimezone(process.env.SMOKE_TZ ?? "Asia/Jakarta");
+if (process.env.SMOKE_DEBUG) {
+  page.on("console", (message) => ["error", "warning"].includes(message.type()) && console.log(`console.${message.type()} ${message.text().slice(0, 300)}`));
+  page.on("pageerror", (error) => console.log(`pageerror ${String(error.message).slice(0, 300)}`));
+  page.on("response", (response) => response.status() >= 400 && console.log(`http ${response.status()} ${response.url().slice(0, 120)}`));
+}
 await page.exposeFunction("__walletRequest", async (method, params) => {
-  const result = await walletRequest(method, params);
+  const result = await walletRequest(method, params).catch((error) => {
+    if (process.env.SMOKE_DEBUG) console.log(`wallet ${method} failed: ${String(error.shortMessage ?? error.message).split("\n")[0].slice(0, 200)}`);
+    throw error;
+  });
+  if (process.env.SMOKE_DEBUG && method === "eth_sendTransaction") console.log(`wallet eth_sendTransaction ok`);
   return JSON.parse(JSON.stringify(result, (_, v) => (typeof v === "bigint" ? "0x" + v.toString(16) : v)));
 });
 await page.evaluateOnNewDocument(() => {

@@ -27,6 +27,7 @@ const META: Record<string, ChainMeta> = {
     name: "Arbitrum Sepolia",
     rpcUrl: "https://sepolia-rollup.arbitrum.io/rpc",
     confirmations: 2,
+    multicall3: "0xcA11bde05977b3631167028862bE2a173976CA11",
     alchemyHost: "arb-sepolia",
     logsApi: "https://arbitrum-sepolia.blockscout.com/api/v2",
     indexerApi: INDEXER_API,
@@ -85,6 +86,10 @@ async function buildNetwork(key: string, entry: RawDeployment) {
   ]);
   const implementationCode = await client.getCode({ address: entry.AnoraFacilityImplementation as Address });
   const assetDecimals = await client.readContract({ address: entry.asset as Address, abi: tokenAbi, functionName: "decimals" });
+  if (meta.multicall3) {
+    const multicallCode = await client.getCode({ address: meta.multicall3 });
+    if (!multicallCode || multicallCode === "0x") throw new Error(`${meta.name} (${entry.chainId}): no multicall3 contract at ${meta.multicall3}.`);
+  }
   const verdict = verifyNetworkState(entry, { factoryCode, implementationCode, asset, minFirstLossBps, paused, implementation, assetDecimals });
   if (!verdict.ok) throw new Error(`${meta.name} (${entry.chainId}): ${verdict.reason}`);
 

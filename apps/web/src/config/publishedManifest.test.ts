@@ -32,6 +32,10 @@ describe("published manifest", () => {
     }
   });
 
+  it("registers multicall3 on every chain so contract reads collapse into one call", () => {
+    for (const network of manifest.networks) expect(network.multicall3, network.key).toBe("0xcA11bde05977b3631167028862bE2a173976CA11");
+  });
+
   it("does not know other chains", () => {
     expect(networkFor(manifest, 1)).toBeUndefined();
   });
