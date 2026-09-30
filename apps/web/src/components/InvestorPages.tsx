@@ -5,6 +5,8 @@ import type { Market } from "./Markets";
 import { AmountInput } from "./AmountInput";
 import type { Address } from "viem";
 import { useTx } from "../hooks/useTx";
+import { useFacilityReview } from "../hooks/useFacilityReview";
+import { describeMetadataError, documentRows, reviewLabel, type UnderwritingRecord } from "../lib/metadata";
 import { DEFAULT_STAGES, STAGE_LABEL, eventTime, maturityOf, realizedReturn, useBook, useMoney, waterfallOf, type BookEvent, type Facility } from "../state/book";
 
 const toNumber = (value: string) => Number(value.replace(/[^0-9.-]/g, "")) || 0;
@@ -125,6 +127,9 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
   const validAmount = Number.isFinite(value) && value > 0 && value <= Math.min(balance, availableValue) && market.accepting && !!me;
   const reservePct = toNumber(market.reserve);
   const review = facilityReview(market);
+  const remote = useFacilityReview(market.id);
+  const record = remote.metadata.data?.kind === "record" ? remote.metadata.data.record : null;
+  const label = remote.metadata.data ? reviewLabel(remote.metadata.data) : null;
 
   return <section className="opportunity-page">
     <button className="back-link" onClick={onBack}><span aria-hidden="true">←</span> Back to Markets</button>
@@ -191,26 +196,59 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
           <small>Your position now tracks this facility until the originator repays.</small>
         </div>}
       </aside>
-      <section className="market-detail-panel"><dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available to invest</dt><dd><TokenAmount value={availableValue} asset={market.asset} /></dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl><div className="detail-section"><header><strong>Funding</strong><span>{market.fundingLabel}</span></header>{market.accepting && <progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress>}</div><div className="detail-section"><header><strong>Protection before your position</strong><span>{market.reserve} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{market.reserve}</span><span>{Math.max(0, 100 - reservePct)}%</span></div><div className="detail-section-footer"><p>The reserve absorbs losses before your position.</p><button className="text-link" onClick={() => setReviewPanel("risk")}>View risk and underwriting</button></div></div><div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>{market.asset}</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>Sample, not verified</dd></div></dl></div><div className="inline-links"><button onClick={() => setReviewPanel("documents")}>Facility documents</button><button>Transaction history</button></div></section>
+      <section className="market-detail-panel"><dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available to invest</dt><dd><TokenAmount value={availableValue} asset={market.asset} /></dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl><div className="detail-section"><header><strong>Funding</strong><span>{market.fundingLabel}</span></header>{market.accepting && <progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress>}</div><div className="detail-section"><header><strong>Protection before your position</strong><span>{market.reserve} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{market.reserve}</span><span>{Math.max(0, 100 - reservePct)}%</span></div><div className="detail-section-footer"><p>The reserve absorbs losses before your position.</p><button className="text-link" onClick={() => setReviewPanel("risk")}>View risk and underwriting</button></div></div><div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>{market.asset}</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>{label ? label.text : remote.api && remote.metadata.isError ? "METADATA_UNAVAILABLE" : "Sample, not verified"}</dd></div></dl></div><div className="inline-links"><button onClick={() => setReviewPanel("documents")}>Facility documents</button><button>Transaction history</button></div></section>
     </div>
     {reviewPanel && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setReviewPanel(null); }}><div className="modal facility-review-modal" role="dialog" aria-modal="true" aria-labelledby="facility-review-title">
       <button className="modal-close" aria-label="Close" onClick={() => setReviewPanel(null)}>×</button>
-      <span className="review-kicker">{reviewPanel === "risk" ? "Sample data · no underwriting service connected" : "Sample data · no document service connected"}</span>
-      <h2 id="facility-review-title">{reviewPanel === "risk" ? "Risk and underwriting" : "Facility documents"}</h2>
-      <p>{market.name} · {market.route}</p>
-      {reviewPanel === "risk" ? <>
-        <div className="underwriting-grade"><strong>{review.grade}</strong><div><span>Underwriting grade</span><small>Reviewed {review.reviewed}</small></div></div>
-        <dl className="underwriting-metrics">
-          <div><dt>Operating history</dt><dd>{review.history}</dd></div>
-          <div><dt>Verified trade assets</dt><dd>{review.verifiedAssets}</dd></div>
-          <div><dt>Largest buyer exposure</dt><dd>{review.concentration}%</dd></div>
-          <div><dt>Document coverage</dt><dd>{review.coverage}×</dd></div>
-        </dl>
-        <div className="review-waterfall"><span style={{ width: `${market.seniorPct}%` }}>Senior {market.seniorPct.toFixed(1)}%</span><span style={{ width: `${market.juniorPct}%` }}>Junior {market.juniorPct.toFixed(1)}%</span><span style={{ width: `${reservePct}%` }}>Reserve {market.reserve}</span></div>
-        <p className="review-note">Illustrative figures generated from the facility name. Only the reserve split above comes from the contract.</p>
-      </> : <div className="document-list">{review.documents.map(([title, detail, status]) => <article key={title}><div><strong>{title}</strong><small>{detail}</small></div><span>{status}</span></article>)}</div>}
+      {reviewPanel === "risk" ? <RiskPanel market={market} review={review} record={record} label={label?.text ?? null} sample={label ? label.sample : true} api={remote.api} error={remote.api && remote.metadata.isError ? describeMetadataError(remote.metadata.error) : null} reservePct={reservePct} /> : <DocumentsPanel market={market} review={review} remote={remote} />}
     </div></div>}
   </section>;
+}
+
+type Review = ReturnType<typeof facilityReview>;
+type Remote = ReturnType<typeof useFacilityReview>;
+
+function RiskPanel({ market, review, record, label, sample, api, error, reservePct }: { market: Market; review: Review; record: UnderwritingRecord | null; label: string | null; sample: boolean; api: string | undefined; error: string | null; reservePct: number }) {
+  const kicker = error ?? (api ? label : "Sample data · no underwriting service connected");
+  const grade = record ? record.underwriting.grade : review.grade;
+  const reviewed = record ? `Reviewed ${new Date(record.underwriting.reviewedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : `Reviewed ${review.reviewed}`;
+  const history = record ? (record.metadata.operatingHistoryYears === undefined ? "Not provided" : `${record.metadata.operatingHistoryYears} years reviewed`) : review.history;
+  const assets = record ? (record.metadata.verifiedAssets ?? "Not provided") : review.verifiedAssets;
+  const concentration = record ? (record.metadata.buyerConcentrationPct === undefined ? "Not provided" : `${record.metadata.buyerConcentrationPct}%`) : `${review.concentration}%`;
+  const coverage = record ? (record.metadata.documentCoverage === undefined ? "Not provided" : `${record.metadata.documentCoverage}×`) : `${review.coverage}×`;
+  return <>
+    <span className="review-kicker">{kicker}</span>
+    <h2 id="facility-review-title">Risk and underwriting</h2>
+    <p>{market.name} · {market.route}</p>
+    {error ? <p className="review-note">The underwriting record could not be loaded. No sample figures are shown in its place.</p> : <>
+      <div className="underwriting-grade"><strong>{grade}</strong><div><span>Underwriting grade</span><small>{reviewed}</small></div></div>
+      <dl className="underwriting-metrics">
+        <div><dt>Operating history</dt><dd>{history}</dd></div>
+        <div><dt>Verified trade assets</dt><dd>{assets}</dd></div>
+        <div><dt>Largest buyer exposure</dt><dd>{concentration}</dd></div>
+        <div><dt>Document coverage</dt><dd>{coverage}</dd></div>
+      </dl>
+      <div className="review-waterfall"><span style={{ width: `${market.seniorPct}%` }}>Senior {market.seniorPct.toFixed(1)}%</span><span style={{ width: `${market.juniorPct}%` }}>Junior {market.juniorPct.toFixed(1)}%</span><span style={{ width: `${reservePct}%` }}>Reserve {market.reserve}</span></div>
+      <p className="review-note">{sample ? "Illustrative figures generated from the facility name. Only the reserve split above comes from the contract." : record?.underwriting.note || "Reviewed figures. The reserve split above comes from the contract."}</p>
+    </>}
+  </>;
+}
+
+function DocumentsPanel({ market, review, remote }: { market: Market; review: Review; remote: Remote }) {
+  const { api, documents, login, signedIn, canSignIn } = remote;
+  const items = documents.data?.items ?? [];
+  const failed = !!api && documents.isError;
+  const rows = api && items.length > 0 ? documentRows(items, api) : null;
+  const kicker = failed ? describeMetadataError(documents.error) : rows ? `Document service · manifest v${documents.data!.manifestVersion}` : api ? "Sample data · no documents uploaded" : "Sample data · no document service connected";
+  return <>
+    <span className="review-kicker">{kicker}</span>
+    <h2 id="facility-review-title">Facility documents</h2>
+    <p>{market.name} · {market.route}</p>
+    {failed ? <p className="review-note">The document list could not be loaded. No sample documents are shown in its place.</p> : rows ? <div className="document-list">
+      {rows.map((row) => <article key={row.title + row.detail}><div><strong>{row.title}</strong><small>{row.detail}</small></div>{row.href ? <a className="text-link" href={row.href} target="_blank" rel="noreferrer">{row.badge}</a> : <span>{row.badge}</span>}</article>)}
+      {rows.some((row) => row.signIn) && !signedIn && <div className="review-note">{canSignIn ? <button className="text-link" onClick={() => login.mutate()} disabled={login.isPending}>{login.isPending ? "Confirm in wallet…" : "Sign in to view"}</button> : "Connect a wallet and sign in to view restricted documents."}{login.isError && <small> {(login.error as Error).message}</small>}</div>}
+    </div> : <div className="document-list">{review.documents.map(([title, detail, status]) => <article key={title}><div><strong>{title}</strong><small>{detail}</small></div><span>{status}</span></article>)}</div>}
+  </>;
 }
 
 export function Portfolio({ notice, latestSupplyId, onView, onActivity, live, onClaim }: { notice: string | null; latestSupplyId: Address | null; onView: (id: Address) => void; onActivity: () => void; live: Facility[]; onClaim: (id: Address) => Promise<void> }) {
