@@ -1,16 +1,17 @@
 {
   "arbitrumSepolia": {
     "chainId": 421614,
-    "deployedAt": "2026-09-20",
+    "deployedAt": "2026-09-30",
     "asset": "0x38513243bA873d05b8b1E6622fE12e7685E4eAc6",
     "assetSymbol": "TestUSDC",
     "faucet": true,
-    "AnoraFactory": "0xDD4977E7D6249d0c5035Ed55DB1c710Fec4E9707",
-    "AnoraFacilityImplementation": "0x58D4b3A476Bf7033661277432b0B96716011a02f",
+    "AnoraFactory": "0xB3Cd0c4c1c32D3d15Dde073d7BAC3529C70b8d0b",
+    "AnoraFacilityImplementation": "0x68Ad038f506cC55478BdbDD80ab07bc528b6d78a",
     "initialRiskAgent": "0x07dF8cd6D20b71ba7F16309d2844B88d1043fFfB",
     "minFirstLossBps": 1000,
     "explorer": "https://sepolia.arbiscan.io",
-    "note": "commit 055a7cd with zero-address checks"
+    "note": "commit b5ab134 with term validation and post-due drawdown guard",
+    "previousFactory": "0xDD4977E7D6249d0c5035Ed55DB1c710Fec4E9707"
   },
   "robinhood": {
     "chainId": 4663,
