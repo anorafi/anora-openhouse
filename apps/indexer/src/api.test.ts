@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { createHandler, type ChainStatus } from "./api";
+import { createLimiter } from "./limit";
 import { openDb, type Db } from "./db";
 import { normalizeLog, type IndexedEvent } from "./events";
 import { makeLog } from "./testing";
@@ -190,3 +191,139 @@ describe("metadata routes", () => {
   });
 });
 
+
+describe("rate limiting", () => {
+  const limited = (options: { peer?: string } = {}) => {
+    let ms = 0;
+    const handle = createHandler({
+      db,
+      networks: [{ chainId: 421614, key: "arbitrum-sepolia", name: "Arbitrum Sepolia", confirmations: 2 }],
+      status,
+      maxLag: 50n,
+      now: () => NOW,
+      origins: ["https://openhouse.anora.finance"],
+      limiter: createLimiter({ now: () => ms, rules: { auth: { capacity: 2, perMinute: 2 }, write: { capacity: 2, perMinute: 2 }, read: { capacity: 3, perMinute: 3 } } }),
+      meta: async (request, url) => (url.pathname.startsWith("/v1/auth/") || url.pathname.startsWith("/v1/uploads/") ? new Response(JSON.stringify({ ok: true }), { status: 200 }) : null),
+    });
+    return {
+      advance: (by: number) => void (ms += by),
+      call: (path: string, init?: RequestInit, peer = options.peer ?? "203.0.113.5") => handle(new Request(`http://127.0.0.1:8100${path}`, init), peer),
+    };
+  };
+
+  test("answers 429 with a typed code, a retry delay, and cors headers", async () => {
+    const { call } = limited();
+    for (let i = 0; i < 3; i += 1) expect((await call("/v1/activity?chainId=421614")).status).toBe(200);
+    const response = await call("/v1/activity?chainId=421614", { headers: { origin: "https://openhouse.anora.finance" } });
+    expect(response.status).toBe(429);
+    expect((await json(response)).error.code).toBe("RATE_LIMITED");
+    expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://openhouse.anora.finance");
+  });
+
+  test("limits sign in calls and writes with their own budgets", async () => {
+    const { call } = limited();
+    const post = (path: string) => call(path, { method: "POST", body: "{}" });
+    expect((await post("/v1/auth/nonce")).status).toBe(200);
+    expect((await post("/v1/auth/verify")).status).toBe(200);
+    expect((await post("/v1/auth/nonce")).status).toBe(429);
+    expect((await call("/v1/uploads/abc", { method: "PUT", body: "x" })).status).toBe(200);
+    expect((await call("/v1/uploads/abc", { method: "PUT", body: "x" })).status).toBe(200);
+    expect((await call("/v1/uploads/abc", { method: "PUT", body: "x" })).status).toBe(429);
+  });
+
+  test("never limits health", async () => {
+    const { call } = limited();
+    for (let i = 0; i < 20; i += 1) expect((await call("/v1/health")).status).toBe(200);
+  });
+
+  test("does not limit preflight requests", async () => {
+    const { call } = limited();
+    for (let i = 0; i < 10; i += 1) expect((await call("/v1/activity", { method: "OPTIONS", headers: { origin: "https://openhouse.anora.finance" } })).status).toBe(204);
+  });
+
+  test("recovers after the retry delay", async () => {
+    const { call, advance } = limited();
+    for (let i = 0; i < 3; i += 1) await call("/v1/activity?chainId=421614");
+    expect((await call("/v1/activity?chainId=421614")).status).toBe(429);
+    advance(20_000);
+    expect((await call("/v1/activity?chainId=421614")).status).toBe(200);
+  });
+
+  test("tells clients apart by the forwarded address when the peer is the local proxy", async () => {
+    const { call } = limited();
+    const as = (client: string) => call("/v1/activity?chainId=421614", { headers: { "x-forwarded-for": client } }, "127.0.0.1");
+    for (let i = 0; i < 3; i += 1) await as("198.51.100.1");
+    expect((await as("198.51.100.1")).status).toBe(429);
+    expect((await as("198.51.100.2")).status).toBe(200);
+  });
+
+  test("ignores the forwarded address from any other peer", async () => {
+    const { call } = limited();
+    const spoof = (client: string) => call("/v1/activity?chainId=421614", { headers: { "x-forwarded-for": client } }, "203.0.113.9");
+    for (let i = 0; i < 3; i += 1) await spoof(`198.51.100.${i}`);
+    expect((await spoof("198.51.100.99")).status).toBe(429);
+  });
+
+  test("rejects a post with an oversized declared body", async () => {
+    const { call } = limited();
+    const response = await call("/v1/auth/verify", { method: "POST", headers: { "content-length": String(64 * 1024 + 1) }, body: "{}" });
+    expect(response.status).toBe(413);
+    expect((await json(response)).error.code).toBe("PAYLOAD_TOO_LARGE");
+  });
+
+  test("rejects a post whose streamed body exceeds the cap", async () => {
+    const { call } = limited();
+    const chunk = new Uint8Array(16 * 1024);
+    const body = new ReadableStream({
+      start(controller) {
+        for (let i = 0; i < 5; i += 1) controller.enqueue(chunk);
+        controller.close();
+      },
+    });
+    const response = await call("/v1/auth/verify", { method: "POST", body, duplex: "half" } as RequestInit);
+    expect(response.status).toBe(413);
+  });
+
+  test("passes a small post body through unchanged", async () => {
+    let received = "";
+    const handle = createHandler({
+      db,
+      networks: [{ chainId: 421614, key: "arbitrum-sepolia", name: "Arbitrum Sepolia", confirmations: 2 }],
+      status,
+      maxLag: 50n,
+      now: () => NOW,
+      origins: [],
+      limiter: createLimiter({ now: () => 0 }),
+      meta: async (request, url) => {
+        if (url.pathname !== "/v1/auth/verify") return null;
+        received = await request.text();
+        return new Response("{}", { status: 200 });
+      },
+    });
+    const response = await handle(new Request("http://127.0.0.1:8100/v1/auth/verify", { method: "POST", body: '{"a":1}' }), "203.0.113.5");
+    expect(response.status).toBe(200);
+    expect(received).toBe('{"a":1}');
+  });
+
+  test("does not cap upload bodies at the json size", async () => {
+    let size = 0;
+    const handle = createHandler({
+      db,
+      networks: [{ chainId: 421614, key: "arbitrum-sepolia", name: "Arbitrum Sepolia", confirmations: 2 }],
+      status,
+      maxLag: 50n,
+      now: () => NOW,
+      origins: [],
+      limiter: createLimiter({ now: () => 0 }),
+      meta: async (request, url) => {
+        if (!url.pathname.startsWith("/v1/uploads/")) return null;
+        size = (await request.arrayBuffer()).byteLength;
+        return new Response("{}", { status: 200 });
+      },
+    });
+    const response = await handle(new Request("http://127.0.0.1:8100/v1/uploads/abc", { method: "PUT", body: new Uint8Array(200 * 1024) }), "203.0.113.5");
+    expect(response.status).toBe(200);
+    expect(size).toBe(200 * 1024);
+  });
+});

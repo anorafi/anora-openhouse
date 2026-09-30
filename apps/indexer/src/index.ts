@@ -6,6 +6,7 @@ import { parseManifest } from "../../web/src/config/manifest";
 import { createHandler, type ChainStatus } from "./api";
 import { createChainClient } from "./client";
 import { openDb } from "./db";
+import { createLimiter } from "./limit";
 import { createChainReader, createRpcReaders } from "./meta/chain";
 import { createMetaRoutes } from "./meta/service";
 import { openMetaStore } from "./meta/store";
@@ -87,8 +88,9 @@ const handler = createHandler({
   now: clock,
   origins,
   meta,
+  limiter: createLimiter({ now: () => Date.now() }),
 });
 
-Bun.serve({ port, hostname: "127.0.0.1", fetch: handler });
+Bun.serve({ port, hostname: "127.0.0.1", fetch: (request, server) => handler(request, server.requestIP(request)?.address) });
 console.log(`indexer listening on 127.0.0.1:${port}, db ${dbPath}, chains ${networks.map((network) => network.key).join(", ")}`);
 for (const network of networks) void loop(network);

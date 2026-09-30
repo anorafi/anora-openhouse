@@ -1,5 +1,6 @@
 import { decodeCursor, type Db, type StoredEvent } from "./db";
 import { deriveFacility, derivePositions } from "./derive";
+import { classify, type createLimiter } from "./limit";
 
 export interface ChainStatus {
   indexedBlock: bigint | null;
@@ -22,12 +23,15 @@ export interface ApiDeps {
   now: () => number;
   origins: string[];
   meta?: (request: Request, url: URL) => Promise<Response | null>;
+  limiter?: ReturnType<typeof createLimiter>;
 }
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const LOCAL_ORIGIN = /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/;
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
+const MAX_JSON_BYTES = 64 * 1024;
+const LOCAL_PEER = /^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/;
 
 class ApiError extends Error {
   constructor(
@@ -165,10 +169,43 @@ function route(deps: ApiDeps, url: URL): unknown {
   throw new ApiError(404, "NOT_FOUND", "Unknown route.");
 }
 
+function clientOf(request: Request, peer: string | undefined) {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (peer && LOCAL_PEER.test(peer) && forwarded) return forwarded;
+  return peer ?? "unknown";
+}
+
+async function capped(request: Request, limit: number): Promise<Request | null> {
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > limit) return null;
+  if (!request.body) return request;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      void reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new Request(request, { body });
+}
+
 export function createHandler(deps: ApiDeps) {
   const allowed = (origin: string | null) => (origin && (deps.origins.includes(origin) || LOCAL_ORIGIN.test(origin)) ? origin : null);
 
-  return async (request: Request): Promise<Response> => {
+  return async (incoming: Request, peer?: string): Promise<Response> => {
+    let request = incoming;
     const origin = allowed(request.headers.get("origin"));
     const cors: Record<string, string> = { vary: "Origin" };
     if (origin) {
@@ -177,8 +214,19 @@ export function createHandler(deps: ApiDeps) {
       cors["access-control-allow-headers"] = "content-type, authorization";
     }
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+    const url = new URL(request.url);
+    const cls = classify(request.method, url.pathname);
+    if (deps.limiter) {
+      const taken = deps.limiter.take(clientOf(request, peer), cls);
+      if (!taken.ok) return send({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, 429, { ...cors, "retry-after": String(taken.retryAfter) });
+    }
+    if (request.method === "POST") {
+      const bounded = await capped(request, MAX_JSON_BYTES);
+      if (!bounded) return send({ error: { code: "PAYLOAD_TOO_LARGE", message: "Request body is too large." } }, 413, cors);
+      request = bounded;
+    }
     if (deps.meta) {
-      const handled = await deps.meta(request, new URL(request.url));
+      const handled = await deps.meta(request, url);
       if (handled) {
         for (const [name, value] of Object.entries(cors)) handled.headers.set(name, value);
         return handled;
@@ -186,7 +234,7 @@ export function createHandler(deps: ApiDeps) {
     }
     if (request.method !== "GET") return send({ error: { code: "METHOD_NOT_ALLOWED", message: "Only GET is supported." } }, 405, cors);
     try {
-      return send(route(deps, new URL(request.url)), 200, cors);
+      return send(route(deps, url), 200, cors);
     } catch (error) {
       if (error instanceof ApiError) return send({ error: { code: error.code, message: error.message, ...error.extra } }, error.status, cors);
       return send({ error: { code: "INTERNAL", message: "Unexpected error." } }, 500, cors);

@@ -131,3 +131,15 @@ systemctl --user start anora-indexer
 ```
 
 It rebuilds from `deploymentBlock` in under a minute on both chains.
+
+## Rate limits
+
+The API limits each client with a token bucket per class of request. A client is identified by its connection address. Behind Caddy the first `X-Forwarded-For` entry is used, and only when the connection comes from the local proxy.
+
+| Class | Requests | Budget per minute |
+|---|---|---|
+| Sign in (`POST /v1/auth/*`) | nonce, verify | 10 |
+| Writes (other `POST`, `PUT /v1/uploads/*`) | metadata, approval, upload URLs, uploads | 20 |
+| Reads (`GET`) | everything except health | 240 |
+
+`GET /v1/health` and preflight requests are not limited. A request over budget gets HTTP 429 with the code `RATE_LIMITED`, a `Retry-After` header in seconds, and the usual CORS headers. A `POST` body over 64 KiB gets HTTP 413 with `PAYLOAD_TOO_LARGE`; file uploads are capped by the upload size limit instead. Buckets idle for ten minutes are dropped.
