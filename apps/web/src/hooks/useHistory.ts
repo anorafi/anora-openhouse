@@ -5,6 +5,7 @@ import { AnoraFacilityAbi, AnoraFactoryAbi } from "../abi";
 import type { ChainLog } from "../lib/history";
 import { fetchIndexerActivity } from "../lib/indexer";
 import { useDeployment } from "./useDeployment";
+import { INDEXER_POLL_MS } from "../config/polling";
 
 const MAX_PAGES = 5;
 const EVENT_ABI = [...AnoraFacilityAbi, ...AnoraFactoryAbi].filter((item) => item.type === "event");
@@ -61,7 +62,7 @@ export function useHistory(facilities: readonly Address[]) {
   return useQuery({
     queryKey: ["history", indexerApi ? "indexer" : "explorer", chainId, factory, indexerApi ? "" : facilities.join(",")],
     enabled: (!!indexerApi || !!api) && !!factory,
-    refetchInterval: 10_000,
+    refetchInterval: INDEXER_POLL_MS,
     retry: indexerApi ? 1 : 3,
     queryFn: async () => {
       if (indexerApi) return fetchIndexerActivity(fetch, indexerApi, chainId);

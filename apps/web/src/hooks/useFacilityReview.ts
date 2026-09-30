@@ -4,6 +4,7 @@ import type { Address } from "viem";
 import { useAccount, useChainId, useSignMessage } from "wagmi";
 import { fetchDocuments, fetchMetadata, signIn } from "../lib/metadata";
 import { useDeployment } from "./useDeployment";
+import { INDEXER_POLL_MS } from "../config/polling";
 
 export function useFacilityReview(facility: Address) {
   const chainId = useChainId();
@@ -17,7 +18,7 @@ export function useFacilityReview(facility: Address) {
     queryKey: ["facility-metadata", chainId, facility],
     enabled: !!api,
     retry: 1,
-    refetchInterval: 15_000,
+    refetchInterval: INDEXER_POLL_MS,
     queryFn: () => fetchMetadata(fetch, api!, chainId, facility),
   });
 
@@ -25,7 +26,7 @@ export function useFacilityReview(facility: Address) {
     queryKey: ["facility-documents", chainId, facility, token ?? "anonymous"],
     enabled: !!api,
     retry: 1,
-    refetchInterval: 15_000,
+    refetchInterval: INDEXER_POLL_MS,
     queryFn: () => fetchDocuments(fetch, api!, chainId, facility, token),
   });
 

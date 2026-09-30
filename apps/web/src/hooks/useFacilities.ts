@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import type { Address } from "viem";
 import { useChainId, useReadContracts } from "wagmi";
 import { facilityContract } from "../config/contracts";
+import { CHAIN_POLL_MS } from "../config/polling";
 
-const REFETCH_MS = 5_000;
 
 export const FacilityStatus = ["Open", "Late", "Defaulted", "Closed"] as const;
 export type FacilityStatusName = (typeof FacilityStatus)[number];
@@ -155,7 +155,7 @@ export function useFacilities(addresses: readonly Address[] | undefined) {
 
   const { data, isLoading, error } = useReadContracts({
     contracts,
-    query: { enabled: list.length > 0, refetchInterval: REFETCH_MS },
+    query: { enabled: list.length > 0, refetchInterval: CHAIN_POLL_MS },
   });
 
   const facilities: FacilityData[] = [];
