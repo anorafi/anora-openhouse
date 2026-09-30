@@ -5,10 +5,12 @@ type Call = { url: string; body: any };
 
 function harness(script: (url: string, body: any, attempt: number) => Response | Promise<Response> | Error, urls = ["https://a.example/rpc", "https://b.example/rpc"]) {
   const calls: Call[] = [];
+  const failures: { chainId: number; host: string; reason: string; methods: string[] }[] = [];
   let clock = 1_000_000;
   const proxy = createRpcProxy({
     upstreams: (chainId) => (chainId === 421614 ? urls : undefined),
     now: () => clock,
+    onFailure: (info) => failures.push(info),
     fetch: async (url, init) => {
       const body = JSON.parse(init.body);
       calls.push({ url, body });
@@ -17,7 +19,7 @@ function harness(script: (url: string, body: any, attempt: number) => Response |
       return outcome;
     },
   });
-  return { proxy, calls, tick: (ms: number) => (clock += ms) };
+  return { proxy, calls, failures, tick: (ms: number) => (clock += ms) };
 }
 
 const ok = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -221,5 +223,30 @@ describe("rpc proxy log ranges", () => {
     await proxy.handle(421614, logs("latest", "latest"));
     await proxy.handle(421614, rpc(2, "eth_getLogs", [{ blockHash: "0xabc" }]));
     expect(calls).toHaveLength(2);
+  });
+});
+
+describe("rpc proxy failure reports", () => {
+  it("reports the host, the reason, and the methods without the url path", async () => {
+    const { proxy, failures } = harness((url, body) => (url.startsWith("https://a.") ? ok({ error: "rate limited" }, 429) : answer(body)), ["https://a.example/v2/SECRETKEY", "https://b.example/rpc"]);
+    await proxy.handle(421614, [rpc(1, "eth_blockNumber"), rpc(2, "eth_chainId")]);
+    expect(failures).toEqual([{ chainId: 421614, host: "a.example", reason: "status 429", methods: ["eth_blockNumber", "eth_chainId"] }]);
+    expect(JSON.stringify(failures)).not.toContain("SECRETKEY");
+  });
+
+  it("reports network errors, malformed answers, and short batches", async () => {
+    const reasons: string[] = [];
+    for (const first of [() => new Error("socket closed"), () => ok({ jsonrpc: "2.0", id: null }), () => ok([{ jsonrpc: "2.0", id: 0, result: "0x1" }])]) {
+      const { proxy, failures } = harness((url, body) => (url.startsWith("https://a.") ? first() : answer(body)));
+      await proxy.handle(421614, [rpc(1, "eth_blockNumber"), rpc(2, "eth_chainId")]);
+      reasons.push(failures[0].reason);
+    }
+    expect(reasons).toEqual(["network: socket closed", "malformed answer", "malformed answer"]);
+  });
+
+  it("strips upstream urls from network error text", async () => {
+    const { proxy, failures } = harness((url, body) => (url.startsWith("https://a.") ? new Error("fetch failed for https://a.example/v2/SECRETKEY") : answer(body)), ["https://a.example/v2/SECRETKEY", "https://b.example/rpc"]);
+    await proxy.handle(421614, rpc(1, "eth_blockNumber"));
+    expect(JSON.stringify(failures)).not.toContain("SECRETKEY");
   });
 });

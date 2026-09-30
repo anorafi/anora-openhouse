@@ -36,7 +36,12 @@ const db = openDb(dbPath);
 const status = new Map<number, ChainStatus>();
 const providerKey = process.env.ALCHEMY_API_KEY;
 const upstreamMap = new Map(networks.map((network) => [network.chainId, upstreamsFor(network, providerKey)]));
-const rpcProxy = createRpcProxy({ upstreams: (chainId) => upstreamMap.get(chainId), fetch: (url, init) => fetch(url, init), now: () => Date.now() });
+const rpcProxy = createRpcProxy({
+  upstreams: (chainId) => upstreamMap.get(chainId),
+  fetch: (url, init) => fetch(url, init),
+  now: () => Date.now(),
+  onFailure: (info) => console.error(`rpc ${info.chainId} ${info.host}: ${info.reason} (${info.methods.slice(0, 4).join(",")}${info.methods.length > 4 ? `,+${info.methods.length - 4}` : ""})`),
+});
 const directUrls = (network: (typeof networks)[number]) => upstreamMap.get(network.chainId)?.length ? (upstreamMap.get(network.chainId) as string[]) : [network.rpcUrl];
 
 function watch(client: ChainClient, chainId: number): ChainClient {

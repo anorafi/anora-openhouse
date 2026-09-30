@@ -27,6 +27,7 @@ export interface RpcProxyOptions {
   maxBatch?: number;
   maxLogRange?: bigint;
   maxEntries?: number;
+  onFailure?: (info: { chainId: number; host: string; reason: string; methods: string[] }) => void;
 }
 
 const ALLOWED = new Set([
@@ -135,21 +136,29 @@ export function createRpcProxy(options: RpcProxyOptions) {
     cache.set(key, { expires: now + ttl, outcome });
   };
 
-  async function forward(urls: string[], calls: Call[]): Promise<Outcome[]> {
+  async function forward(chainId: number, urls: string[], calls: Call[]): Promise<Outcome[]> {
     const single = calls.length === 1;
     const payload = single
       ? { jsonrpc: "2.0", id: 0, method: calls[0].method, params: calls[0].params ?? [] }
       : calls.map((call, index) => ({ jsonrpc: "2.0", id: index, method: call.method, params: call.params ?? [] }));
     const body = JSON.stringify(payload);
+    const methods = calls.map((call) => call.method);
     for (const url of urls) {
+      const report = (reason: string) => options.onFailure?.({ chainId, host: new URL(url).host, reason, methods });
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const response = await options.fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body, signal: controller.signal });
-        if (!response.ok) continue;
+        if (!response.ok) {
+          report(`status ${response.status}`);
+          continue;
+        }
         const parsed = (await response.json()) as unknown;
         const list = single ? [parsed] : Array.isArray(parsed) ? parsed : null;
-        if (!list || list.length !== calls.length) continue;
+        if (!list || list.length !== calls.length) {
+          report("malformed answer");
+          continue;
+        }
         const outcomes: (Outcome | undefined)[] = new Array(calls.length).fill(undefined);
         for (const entry of list) {
           if (!isRecord(entry)) continue;
@@ -162,7 +171,11 @@ export function createRpcProxy(options: RpcProxyOptions) {
           }
         }
         if (outcomes.every((outcome) => outcome !== undefined)) return outcomes as Outcome[];
-      } catch {
+        report("malformed answer");
+      } catch (error) {
+        const aborted = controller.signal.aborted;
+        const text = String((error as Error)?.message ?? error).split("\n")[0].replaceAll(url, "").replace(/https?:\/\/\S+/g, "");
+        report(aborted ? "timeout" : `network: ${text.trim()}`);
         continue;
       } finally {
         clearTimeout(timer);
@@ -223,7 +236,7 @@ export function createRpcProxy(options: RpcProxyOptions) {
       void (async () => {
         let outcomes: Outcome[];
         try {
-          outcomes = await forward(urls, fresh.map((entry) => entry.call));
+          outcomes = await forward(chainId, urls, fresh.map((entry) => entry.call));
         } catch {
           outcomes = fresh.map(() => unavailable);
         }
