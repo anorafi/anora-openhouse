@@ -69,3 +69,7 @@ export function buildAbiBundle(input: {
     codeHashes: Object.fromEntries(Object.entries(input.codeHashes).map(([chainId, hashes]) => [String(chainId), hashes])),
   };
 }
+
+export function proxyRpcUrl(indexerApi: string | undefined, chainId: number): string | undefined {
+  return indexerApi ? `${indexerApi.replace(/\/+$/, "")}/rpc/${chainId}` : undefined;
+}

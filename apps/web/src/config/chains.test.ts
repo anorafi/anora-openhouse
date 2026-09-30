@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chainOf, orderedNetworks, transportUrl } from "./chains";
+import { chainOf, orderedNetworks } from "./chains";
 import { parseManifest, type ManifestNetwork } from "./manifest";
 
 const address = (n: number) => `0x${n.toString(16).padStart(40, "0")}`;
@@ -34,20 +34,6 @@ describe("chainOf", () => {
   it("registers multicall3 when the manifest provides it", () => {
     const chain = chainOf(network({ multicall3: address(7) as `0x${string}` }));
     expect(chain.contracts?.multicall3?.address).toBe(address(7));
-  });
-});
-
-describe("transportUrl", () => {
-  it("uses the manifest rpc url without a key", () => {
-    expect(transportUrl(network({ alchemyHost: "arb-sepolia" }), undefined)).toBe("https://sepolia-rollup.arbitrum.io/rpc");
-  });
-
-  it("switches to the provider url when a key and host exist", () => {
-    expect(transportUrl(network({ alchemyHost: "arb-sepolia" }), "KEY")).toBe("https://arb-sepolia.g.alchemy.com/v2/KEY");
-  });
-
-  it("ignores the key when the network has no provider host", () => {
-    expect(transportUrl(network(), "KEY")).toBe("https://sepolia-rollup.arbitrum.io/rpc");
   });
 });
 

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join } from "node:path";
 import { createPublicClient, http, keccak256, parseAbi, type Address } from "viem";
 import type { ManifestNetwork } from "../src/config/manifest";
-import { assembleManifest, buildAbiBundle, findDeploymentBlock, verifyNetworkState, type BroadcastRun, type RawDeployment } from "./manifest-lib";
+import { assembleManifest, buildAbiBundle, findDeploymentBlock, proxyRpcUrl, verifyNetworkState, type BroadcastRun, type RawDeployment } from "./manifest-lib";
 
 const root = join(dirname(new URL(import.meta.url).pathname), "../../..");
 const publicDir = join(root, "apps/web/public");
@@ -94,7 +94,8 @@ async function buildNetwork(key: string, entry: RawDeployment) {
     key: meta.key,
     name: meta.name,
     enabled: true,
-    rpcUrl: meta.rpcUrl,
+    rpcUrl: proxyRpcUrl(meta.indexerApi, entry.chainId) ?? meta.rpcUrl,
+    publicRpcUrl: meta.rpcUrl,
     explorerUrl: entry.explorer,
     confirmations: meta.confirmations,
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },

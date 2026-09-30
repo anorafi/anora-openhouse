@@ -23,6 +23,15 @@ describe("published manifest", () => {
     expect(deployment.faucet).toBe(false);
   });
 
+  it("reads every chain through the indexer proxy and keeps a public fallback", () => {
+    for (const network of manifest.networks) {
+      expect(network.rpcUrl).toBe(`${network.indexerApi}/rpc/${network.chainId}`);
+      expect(network.publicRpcUrl).toBeDefined();
+      expect(network.publicRpcUrl).not.toContain("/rpc/" + network.chainId);
+      expect(JSON.stringify(network)).not.toMatch(/g\.alchemy\.com\/v2\/[A-Za-z0-9_-]{8,}/);
+    }
+  });
+
   it("does not know other chains", () => {
     expect(networkFor(manifest, 1)).toBeUndefined();
   });

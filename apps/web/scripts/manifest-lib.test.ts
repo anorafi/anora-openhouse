@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseManifest } from "../src/config/manifest";
-import { assembleManifest, buildAbiBundle, findDeploymentBlock, verifyNetworkState, type BroadcastRun, type RawDeployment } from "./manifest-lib";
+import { assembleManifest, buildAbiBundle, findDeploymentBlock, proxyRpcUrl, verifyNetworkState, type BroadcastRun, type RawDeployment } from "./manifest-lib";
 
 const address = (n: number) => `0x${n.toString(16).padStart(40, "0")}`;
 
@@ -112,5 +112,19 @@ describe("buildAbiBundle", () => {
       abi: { AnoraFactory: [{ type: "function", name: "asset" }], AnoraFacility: [{ type: "function", name: "deposit" }] },
       codeHashes: { "421614": { factory: "0x11", facilityImplementation: "0x22" } },
     });
+  });
+});
+
+describe("proxyRpcUrl", () => {
+  it("points at the indexer proxy for the chain", () => {
+    expect(proxyRpcUrl("https://anora-api.dimsky.xyz", 421614)).toBe("https://anora-api.dimsky.xyz/rpc/421614");
+  });
+
+  it("tolerates a trailing slash", () => {
+    expect(proxyRpcUrl("https://anora-api.dimsky.xyz/", 4663)).toBe("https://anora-api.dimsky.xyz/rpc/4663");
+  });
+
+  it("returns nothing without an indexer address", () => {
+    expect(proxyRpcUrl(undefined, 4663)).toBeUndefined();
   });
 });

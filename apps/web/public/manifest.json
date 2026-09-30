@@ -8,7 +8,8 @@
       "key": "arbitrum-sepolia",
       "name": "Arbitrum Sepolia",
       "enabled": true,
-      "rpcUrl": "https://sepolia-rollup.arbitrum.io/rpc",
+      "rpcUrl": "https://anora-api.dimsky.xyz/rpc/421614",
+      "publicRpcUrl": "https://sepolia-rollup.arbitrum.io/rpc",
       "explorerUrl": "https://sepolia.arbiscan.io",
       "confirmations": 2,
       "nativeCurrency": {
@@ -41,7 +42,8 @@
       "key": "robinhood",
       "name": "Robinhood Chain",
       "enabled": true,
-      "rpcUrl": "https://rpc.mainnet.chain.robinhood.com",
+      "rpcUrl": "https://anora-api.dimsky.xyz/rpc/4663",
+      "publicRpcUrl": "https://rpc.mainnet.chain.robinhood.com",
       "explorerUrl": "https://robinhoodchain.blockscout.com",
       "confirmations": 2,
       "nativeCurrency": {

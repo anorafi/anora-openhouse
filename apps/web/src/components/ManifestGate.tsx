@@ -16,7 +16,7 @@ const queryClient = new QueryClient({
 type State = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; manifest: Manifest };
 
 function Ready({ manifest, children }: { manifest: Manifest; children: ReactNode }) {
-  const config = useMemo(() => createWagmiConfig(manifest, import.meta.env.VITE_ALCHEMY_API_KEY as string | undefined), [manifest]);
+  const config = useMemo(() => createWagmiConfig(manifest), [manifest]);
   return (
     <ManifestContext.Provider value={manifest}>
       <WagmiProvider config={config}>

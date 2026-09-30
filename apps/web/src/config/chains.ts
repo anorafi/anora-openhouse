@@ -12,11 +12,6 @@ export function chainOf(network: ManifestNetwork): Chain {
   });
 }
 
-export function transportUrl(network: ManifestNetwork, providerKey: string | undefined): string {
-  if (providerKey && network.alchemyHost) return `https://${network.alchemyHost}.g.alchemy.com/v2/${providerKey}`;
-  return network.rpcUrl;
-}
-
 export function orderedNetworks(manifest: Manifest): ManifestNetwork[] {
   const enabled = enabledNetworks(manifest);
   return [
