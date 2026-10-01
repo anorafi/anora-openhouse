@@ -2,7 +2,10 @@ import { TokenAmount } from "./TokenAmount";
 import { useMemo, useState, type CSSProperties } from "react";
 import { AmountInput } from "./AmountInput";
 import { FilterBar, presentOptions } from "./FilterBar";
+import { FaucetButton } from "./FaucetButton";
+import { useDeployment } from "../hooks/useDeployment";
 import { useTx } from "../hooks/useTx";
+import { FACILITY_DEFAULTS, GRACE_PRESETS, TENOR_PRESETS, defaultTerms, termsLabel, termsValid, toSeconds, unitsFor, type TenorUnit } from "../lib/terms";
 import { fundingState, DEFAULT_STAGES, ORIGINATOR_ACTION, STAGE_LABEL, eventTime, isMine, owedOn, waterfallOf, randomDraft, useBook, useDraftSize, useMoney, type BookEvent, type Facility, type Stage } from "../state/book";
 
 /** Protocol-level floor, mirroring minFirstLossBps on the factory. */
@@ -429,6 +432,7 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
   const { approve, createFacility, facilities, factory, symbol, balance } = useBook();
   const usd = useMoney();
   const size = useDraftSize();
+  const units = unitsFor(useDeployment()?.faucet);
   const tx = useTx();
   const [form, setForm] = useState(() => randomDraft(facilities.map((facility) => facility.name), size));
   const [phase, setPhase] = useState<OpenPhase>("approve");
@@ -445,8 +449,8 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
   const seniorPct = Math.max(0, 100 - reservePct);
   const meetsFloor = firstLossValue >= minFirstLoss && firstLossValue > 0;
   const affordable = firstLossValue <= balance;
-  const canOpen = form.name.trim() !== "" && form.company.trim() !== "" && limitValue > 0 && meetsFloor && reservePct < 100 && affordable && toNumber(form.duration) > 0 && !!factory;
-  const seniorOpen = Math.max(0, Math.min(limitValue - firstLossValue, firstLossValue * 2.25));
+  const canOpen = form.name.trim() !== "" && form.company.trim() !== "" && limitValue > 0 && meetsFloor && reservePct < 100 && affordable && termsValid(form) && !!factory;
+  const seniorOpen = Math.max(0, Math.min(limitValue - firstLossValue, firstLossValue * FACILITY_DEFAULTS.seniorPerJuniorBps / 10_000));
 
   const next = async () => {
     if (phase === "approve") {
@@ -458,8 +462,8 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
       limit: limitValue,
       firstLoss: firstLossValue,
       feePct: feeValue,
-      tenorMinutes: toNumber(form.duration),
-      graceMinutes: toNumber(form.grace),
+      tenorSeconds: toSeconds(toNumber(form.duration), form.unit),
+      graceSeconds: toSeconds(toNumber(form.grace), form.unit),
     }));
     if (opened) setPhase("done");
   };
@@ -477,7 +481,7 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
             <div><dt>Credit limit</dt><dd><TokenAmount value={limitValue} asset={symbol} /></dd></div>
             <div><dt>First-loss stake</dt><dd><TokenAmount value={firstLossValue} asset={symbol} /></dd></div>
             <div><dt>Financing fee</dt><dd>{form.feePct}%</dd></div>
-            <div><dt>Duration</dt><dd>{form.duration} min</dd></div>
+            <div><dt>Duration</dt><dd>{termsLabel(form)}</dd></div>
           </dl>
           <button className="accent-button wide" onClick={onOpened}>View my facilities</button>
           <small>Switch to the capital provider workspace to supply against it.</small>
@@ -502,12 +506,17 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
         <label>First-loss stake<AmountInput value={form.firstLoss} onChange={set("firstLoss")} suffix={symbol} action={<button onClick={() => set("firstLoss")(String(Math.ceil(minFirstLoss)))}>Min</button>} /></label>
         <p className="balance-row"><span>Protocol floor ({MIN_FIRST_LOSS_BPS / 100}%)</span><strong><TokenAmount value={minFirstLoss} asset={symbol} /></strong></p>
         <p className="balance-row"><span>Wallet balance</span><strong><TokenAmount value={balance} asset={symbol} /></strong></p>
+        <FaucetButton />
         <TrancheStructure total={limitValue} asset={symbol} seniorPct={seniorPct} juniorPct={0} reservePct={reservePct} />
         <div className="field-pair">
           <label>Financing fee<div className="amount-input"><input inputMode="decimal" value={form.feePct} onChange={(e) => set("feePct")(e.target.value)} /><span>%</span></div></label>
-          <label>Duration<div className="amount-input"><input inputMode="numeric" value={form.duration} onChange={(e) => set("duration")(e.target.value.replace(/\D/g, ""))} /><span>min</span></div></label>
+          <label>Duration<div className="amount-input"><input inputMode="numeric" value={form.duration} onChange={(e) => set("duration")(e.target.value.replace(/\D/g, ""))} />{units.length > 1
+            ? <select className="unit-select" aria-label="Duration unit" value={form.unit} onChange={(e) => setForm((prev) => ({ ...prev, ...defaultTerms(e.target.value as TenorUnit) }))}>{units.map((unit) => <option key={unit} value={unit}>{unit === "days" ? "days" : "demo minutes"}</option>)}</select>
+            : <span>days</span>}</div></label>
         </div>
-        <label>Grace before default<div className="amount-input"><input inputMode="numeric" value={form.grace} onChange={(e) => set("grace")(e.target.value.replace(/\D/g, ""))} /><span>min</span></div></label>
+        <div className="preset-row" aria-label="Duration presets">{TENOR_PRESETS[form.unit].map((preset) => <button key={preset} className={String(preset) === form.duration ? "active" : ""} onClick={() => set("duration")(String(preset))}>{preset} {form.unit}</button>)}</div>
+        <label>Grace before default<div className="amount-input"><input inputMode="numeric" value={form.grace} onChange={(e) => set("grace")(e.target.value.replace(/\D/g, ""))} /><span>{form.unit}</span></div></label>
+        <div className="preset-row" aria-label="Grace presets">{GRACE_PRESETS[form.unit].map((preset) => <button key={preset} className={String(preset) === form.grace ? "active" : ""} onClick={() => set("grace")(String(preset))}>{preset} {form.unit}</button>)}</div>
 
         </fieldset>
 
@@ -542,8 +551,9 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
             <div><dt>Protection reserve</dt><dd>{reservePct.toFixed(1)}%</dd></div>
             <div><dt>Open to capital providers</dt><dd><TokenAmount value={seniorOpen} asset={symbol} /></dd></div>
             <div><dt>Financing fee</dt><dd>{form.feePct}%</dd></div>
-            <div><dt>Capital provider return</dt><dd>{(feeValue * 0.6).toFixed(2)}%</dd></div>
-            <div><dt>Duration</dt><dd>{form.duration} min, then {form.grace} min grace</dd></div>
+            <div><dt>Capital provider return</dt><dd>{(feeValue * FACILITY_DEFAULTS.seniorFeeShareBps / 10_000).toFixed(2)}%</dd></div>
+            <div><dt>Late fee</dt><dd>{(FACILITY_DEFAULTS.lateFeePerDayBps / 100).toFixed(2)}% per day</dd></div>
+            <div><dt>Duration</dt><dd>{termsLabel(form)}</dd></div>
           </dl>
         </div>
       </section>

@@ -65,10 +65,12 @@ const NO_TOTALS: Totals = { drawn: 0, repaid: 0, recovered: 0, defaultLoss: 0 };
 export const fromUnits = (units: bigint) => Number(formatUsdc(units).replace(/,/g, ""));
 export const toUnits = (value: number) => parseUsdc(value.toFixed(6));
 
+const counted = (value: number, noun: string) => `${value} ${noun}${value === 1 ? "" : "s"}`;
+
 export function durationText(seconds: number) {
-  if (seconds < 3_600) return `${Math.round(seconds / 60)} min`;
-  if (seconds < 86_400) return `${Math.round(seconds / 3_600)} hours`;
-  return `${Math.round(seconds / 86_400)} days`;
+  if (seconds < 3_600) return counted(Math.round(seconds / 60), "minute");
+  if (seconds < 86_400) return counted(Math.round(seconds / 3_600), "hour");
+  return counted(Math.round(seconds / 86_400), "day");
 }
 
 function claimableAssets(data: FacilityData) {

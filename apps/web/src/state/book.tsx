@@ -14,8 +14,10 @@ import { describeIndexerError } from "../lib/indexer";
 import { useMyPositions } from "../hooks/usePositions";
 import { draftSizeFor, fromUnits, fundingState, marketAction, toFacility, toUnits, type DraftSize, type Facility, type Stage } from "../lib/book";
 import { encodeFacilityName, type Listing } from "../lib/facilityName";
+import { FAUCET_AMOUNT, faucetVisible } from "../lib/faucet";
 import { guardedWrite } from "../lib/guardedWrite";
 import { depositedBy, eventsFrom, totalsFrom, type BookEvent } from "../lib/history";
+import { FACILITY_DEFAULTS, GRACE_PRESETS, TENOR_PRESETS, defaultTerms, type Terms } from "../lib/terms";
 
 export type { Facility, Stage } from "../lib/book";
 export type { BookEvent } from "../lib/history";
@@ -52,13 +54,10 @@ export interface NewFacility {
   limit: number;
   firstLoss: number;
   feePct: number;
-  tenorMinutes: number;
-  graceMinutes: number;
+  tenorSeconds: number;
+  graceSeconds: number;
 }
 
-const LATE_FEE_PER_DAY_BPS = 10n;
-const SENIOR_PER_JUNIOR_BPS = 22_500n;
-const SENIOR_FEE_SHARE_BPS = 6_000n;
 const SENIOR = 0;
 const JUNIOR = 1;
 
@@ -71,6 +70,8 @@ interface BookValue {
   factory: Address | undefined;
   latestSupplyId: Address | null;
   historyError: string | null;
+  canFaucet: boolean;
+  faucet: () => Promise<void>;
   approve: (spender: Address, amount: number) => Promise<void>;
   createFacility: (input: NewFacility) => Promise<void>;
   supply: (id: Address, amount: number) => Promise<void>;
@@ -154,16 +155,21 @@ export function BookProvider({ children }: { children: ReactNode }) {
       args: [encodeFacilityName(input.listing), {
         limit,
         firstLoss: toUnits(input.firstLoss),
-        tenor: BigInt(Math.round(input.tenorMinutes * 60)),
-        grace: BigInt(Math.round(input.graceMinutes * 60)),
+        tenor: BigInt(Math.round(input.tenorSeconds)),
+        grace: BigInt(Math.round(input.graceSeconds)),
         financingFeeBps: BigInt(Math.round(input.feePct * 100)),
-        lateFeePerDayBps: LATE_FEE_PER_DAY_BPS,
-        seniorPerJuniorBps: SENIOR_PER_JUNIOR_BPS,
-        seniorFeeShareBps: SENIOR_FEE_SHARE_BPS,
+        lateFeePerDayBps: BigInt(FACILITY_DEFAULTS.lateFeePerDayBps),
+        seniorPerJuniorBps: BigInt(FACILITY_DEFAULTS.seniorPerJuniorBps),
+        seniorFeeShareBps: BigInt(FACILITY_DEFAULTS.seniorFeeShareBps),
         capitalCap: limit,
       }],
     });
   }, [approveUnits, chainId, deployment, send]);
+
+  const faucet = useCallback(async () => {
+    if (!deployment || !me) throw new Error("Connect a wallet first.");
+    await send({ ...assetContract(deployment.asset), chainId, functionName: "mint", args: [me, toUnits(FAUCET_AMOUNT)] });
+  }, [chainId, deployment, me, send]);
 
   const supply = useCallback(async (id: Address, amount: number) => {
     await approveUnits(id, toUnits(amount));
@@ -207,6 +213,8 @@ export function BookProvider({ children }: { children: ReactNode }) {
     factory: deployment?.factory,
     latestSupplyId,
     historyError,
+    canFaucet: faucetVisible({ faucet: deployment?.faucet, writes: deployment?.writes, connected: !!me }),
+    faucet,
     approve,
     createFacility,
     supply,
@@ -214,7 +222,7 @@ export function BookProvider({ children }: { children: ReactNode }) {
     repay,
     claim,
     recover,
-  }), [approve, balanceUnits, claim, createFacility, deployment, draw, events, facilities, historyError, latestSupplyId, me, recover, repay, supply, symbol]);
+  }), [approve, balanceUnits, claim, createFacility, deployment, draw, events, faucet, facilities, historyError, latestSupplyId, me, recover, repay, supply, symbol]);
 
   return <BookContext.Provider value={value}>{children}</BookContext.Provider>;
 }
@@ -314,10 +322,12 @@ const step = (min: number, max: number, to: number) => Math.round((min + Math.ra
 
 export interface FacilityDraft {
   name: string; company: string; route: string; type: string; icon: string;
-  limit: string; firstLoss: string; feePct: string; duration: string; grace: string;
+  limit: string; firstLoss: string; feePct: string;
 }
 
-export function randomDraft(taken: readonly string[], size: DraftSize): FacilityDraft {
+export type FacilityForm = FacilityDraft & Terms;
+
+export function randomDraft(taken: readonly string[], size: DraftSize): FacilityForm {
   const free = FACILITY_POOL.filter((entry) => !taken.some((name) => name.startsWith(entry.name)));
   const base = pick(free.length > 0 ? free : FACILITY_POOL);
   const limit = step(size.min, size.max, size.step);
@@ -331,7 +341,8 @@ export function randomDraft(taken: readonly string[], size: DraftSize): Facility
     limit: String(limit),
     firstLoss: String(Math.ceil((limit * reservePct) / 100 / size.step) * size.step),
     feePct: String(pick([4, 5, 6])),
-    duration: String(pick([2, 3])),
-    grace: "1",
+    ...defaultTerms("days"),
+    duration: String(pick(TENOR_PRESETS.days)),
+    grace: String(pick(GRACE_PRESETS.days)),
   };
 }

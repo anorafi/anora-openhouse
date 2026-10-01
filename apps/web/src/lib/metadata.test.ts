@@ -25,6 +25,15 @@ describe("fetchMetadata", () => {
     expect(state).toEqual({ kind: "record", record: record() });
   });
 
+  it("treats a facility the indexer has not seen yet as having no record", async () => {
+    expect(await fetchMetadata(async () => respond({ error: { code: "NOT_FOUND", message: "Unknown route." } }, 404), API, 421614, FACILITY)).toEqual({ kind: "none" });
+  });
+
+  it("still reports other failures", async () => {
+    await expect(fetchMetadata(async () => respond({ error: { code: "RATE_LIMITED", message: "slow down" } }, 429), API, 421614, FACILITY)).rejects.toMatchObject({ code: "RATE_LIMITED" });
+    await expect(fetchMetadata(async () => respond({}, 500), API, 421614, FACILITY)).rejects.toMatchObject({ code: "METADATA_UNAVAILABLE" });
+  });
+
   it("treats a missing record as none", async () => {
     expect(await fetchMetadata(async () => respond({ error: { code: "METADATA_NOT_FOUND", message: "none" } }, 404), API, 421614, FACILITY)).toEqual({ kind: "none" });
   });

@@ -68,7 +68,7 @@ function fail(response: Response, body: Record<string, any>): never {
 
 export async function fetchMetadata(fetcher: Fetcher, api: string, chainId: number, facility: string): Promise<MetadataState> {
   const { response, body } = await read(fetcher, `${api}/v1/facilities/${chainId}/${facility}/metadata`);
-  if (response.status === 404 && body.error?.code === "METADATA_NOT_FOUND") return { kind: "none" };
+  if (response.status === 404 && (body.error?.code === "METADATA_NOT_FOUND" || body.error?.code === "NOT_FOUND")) return { kind: "none" };
   if (!response.ok || body.error) fail(response, body);
   return { kind: "record", record: body as UnderwritingRecord };
 }
