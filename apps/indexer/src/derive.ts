@@ -1,6 +1,6 @@
 import type { IndexedEvent } from "./events";
 
-export type FacilityStatus = "FUNDING" | "FUNDED" | "ACTIVE" | "LATE" | "DEFAULTED" | "RECOVERED" | "REPAID";
+export type FacilityStatus = "FUNDING" | "FUNDED" | "ACTIVE" | "LATE" | "DEFAULTED" | "RECOVERED" | "REPAID" | "CLOSED";
 export type PositionStatus = "HELD" | "CLAIMABLE" | "SETTLED";
 
 export interface FacilitySummary {
@@ -58,14 +58,15 @@ export function deriveFacility(events: IndexedEvent[], nowSeconds: number): Faci
   let defaulted = false;
   let totalLoss = 0n;
   let recovered = 0n;
-  let everDeposited = false;
+  let heldShares = 0n;
   for (const e of sorted) {
     const d = e.data;
     if (e.event === "Deposited") {
-      everDeposited = true;
+      heldShares += big(d.shares);
       if (d.tranche === "SENIOR") senior += big(d.assets);
       else junior += big(d.assets);
     } else if (e.event === "Withdrawn") {
+      heldShares -= big(d.shares);
       if (d.tranche === "SENIOR") outSenior += big(d.assets);
       else outJunior += big(d.assets);
     } else if (e.event === "Drawn") {
@@ -88,8 +89,9 @@ export function deriveFacility(events: IndexedEvent[], nowSeconds: number): Faci
   else if (closed) status = "REPAID";
   else if (late) status = "LATE";
   else if (drawn > 0n) status = "ACTIVE";
-  else if (everDeposited) status = "FUNDED";
+  else if (heldShares > 0n) status = "FUNDED";
   else status = "FUNDING";
+  if ((status === "REPAID" || status === "RECOVERED") && heldShares === 0n) status = "CLOSED";
   const last = sorted[sorted.length - 1];
   return {
     chainId: created.chainId,
