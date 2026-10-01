@@ -208,7 +208,9 @@ describe("documents", () => {
   test("rejects a tampered or expired upload url and a second upload into the same slot", async () => {
     const owner = await login(originator);
     const slot = await json(await requestUpload(owner, { name: "a.pdf", mime: "application/pdf", size: pdf.length, visibility: "public" }));
-    expect((await send(slot.uploadUrl.replace(/sig=[0-9a-f]/, "sig=0"), { method: "PUT", body: pdf })).status).toBe(403);
+    const tamperedUpload = slot.uploadUrl.replace(/sig=([0-9a-f])/, (_: string, first: string) => `sig=${first === "0" ? "1" : "0"}`);
+    expect(tamperedUpload).not.toBe(slot.uploadUrl);
+    expect((await send(tamperedUpload, { method: "PUT", body: pdf })).status).toBe(403);
     expect((await send(slot.uploadUrl, { method: "PUT", body: pdf })).status).toBe(201);
     expect((await send(slot.uploadUrl, { method: "PUT", body: pdf })).status).toBe(409);
     const late = await json(await requestUpload(owner, { name: "c.pdf", mime: "application/pdf", size: pdf.length, visibility: "public" }));
