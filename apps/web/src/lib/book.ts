@@ -4,6 +4,7 @@ import type { Position } from "../hooks/usePositions";
 import { decodeFacilityName } from "./facilityName";
 import { valueShares } from "./facility";
 import { formatUsdc, parseUsdc } from "./format";
+import { trancheStructure } from "./tranche";
 
 export type Stage =
   | "open" | "funded" | "drawn" | "late" | "repaid" | "settled"
@@ -39,8 +40,14 @@ export interface Facility {
   durationDays: number;
   durationLabel: string;
   reservePct: number;
+  firstLossPct: number;
   seniorPct: number;
   juniorPct: number;
+  seniorSupplied: number;
+  juniorSupplied: number;
+  seniorAvailable: number;
+  juniorAvailable: number;
+  seniorFeeShareBps: number;
   limit: number;
   firstLoss: number;
   supplied: number;
@@ -89,11 +96,16 @@ export function stageOf(data: FacilityData): Stage {
   return hasHolders ? "funded" : "open";
 }
 
+const smaller = (values: bigint[]) => values.reduce((min, value) => (value < min ? value : min));
+
 function availableToSupply(data: FacilityData, stage: Stage) {
-  if (stage !== "open" && stage !== "funded") return 0n;
+  if (stage !== "open" && stage !== "funded") return { senior: 0n, junior: 0n };
   const underLimit = data.terms.limit > claimableAssets(data) ? data.terms.limit - claimableAssets(data) : 0n;
   const underCap = data.terms.capitalCap > data.totalCapital ? data.terms.capitalCap - data.totalCapital : 0n;
-  return [data.seniorCapacity, underLimit, underCap].reduce((min, value) => (value < min ? value : min));
+  return {
+    senior: smaller([data.seniorCapacity, underLimit, underCap]),
+    junior: smaller([underLimit, underCap]),
+  };
 }
 
 export function toFacility(data: FacilityData, position: Position, totals: Totals = NO_TOTALS, asset = "USDC"): Facility {
@@ -113,7 +125,19 @@ export function toFacility(data: FacilityData, position: Position, totals: Total
     valueShares(position.seniorShares, data.seniorTotalShares, data.seniorAssets) +
     valueShares(position.juniorShares, data.juniorTotalShares, data.juniorAssets);
 
-  const reservePct = limit > 0 ? ((firstLoss + fromUnits(data.juniorTotalShares > 0n ? data.juniorAssets : 0n)) / limit) * 100 : 0;
+  const juniorSupplied = fromUnits(data.juniorTotalShares > 0n ? data.juniorAssets : 0n);
+  const seniorSupplied = fromUnits(data.seniorAssets);
+  const structure = trancheStructure({
+    limit,
+    firstLoss,
+    seniorPerJuniorBps: Number(data.terms.seniorPerJuniorBps),
+    seniorAssets: seniorSupplied,
+    juniorAssets: juniorSupplied,
+  });
+  const reservePct = limit > 0 ? ((firstLoss + juniorSupplied) / limit) * 100 : 0;
+  const availability = availableToSupply(data, stage);
+  const seniorAvailable = fromUnits(availability.senior);
+  const juniorAvailable = fromUnits(availability.junior);
 
   return {
     id: data.address,
@@ -127,12 +151,18 @@ export function toFacility(data: FacilityData, position: Position, totals: Total
     durationDays: tenorSeconds / 86_400,
     durationLabel: durationText(tenorSeconds),
     reservePct,
-    seniorPct: 100 - reservePct,
-    juniorPct: 0,
+    firstLossPct: structure.firstLossPct,
+    seniorPct: structure.seniorPct,
+    juniorPct: structure.juniorPct,
+    seniorSupplied,
+    juniorSupplied,
+    seniorAvailable,
+    juniorAvailable,
+    seniorFeeShareBps: Number(data.terms.seniorFeeShareBps),
     limit,
     firstLoss,
     supplied: fromUnits(claimableAssets(data)),
-    available: fromUnits(availableToSupply(data, stage)),
+    available: Math.max(seniorAvailable, juniorAvailable),
     liquidity: fromUnits(data.liquidity),
     drawn: data.principal > 0n ? fromUnits(data.principal) : totals.drawn,
     owed: fromUnits(data.owed),
