@@ -70,8 +70,8 @@ describe("stageOf", () => {
   it("walks the happy path from the facility's own state", () => {
     expect(stageOf(data())).toBe("open");
     expect(stageOf(data({ seniorAssets: 9n * U, seniorTotalShares: 9n * U }))).toBe("funded");
-    expect(stageOf(data({ seniorAssets: 9n * U, seniorTotalShares: 9n * U, principal: 9n * U }))).toBe("drawn");
-    expect(stageOf(data({ ...withStatus("Late"), principal: 9n * U }))).toBe("late");
+    expect(stageOf(data({ seniorAssets: 9n * U, seniorTotalShares: 9n * U, principal: 9n * U, dueAt: 1_900_000_000n }))).toBe("drawn");
+    expect(stageOf(data({ ...withStatus("Late"), principal: 9n * U, dueAt: 1_900_000_000n }))).toBe("late");
     expect(stageOf(data({ ...withStatus("Closed"), seniorAssets: 9_270_000n, seniorTotalShares: 9n * U }))).toBe("repaid");
   });
 
@@ -103,7 +103,7 @@ describe("toFacility", () => {
   });
 
   it("stops offering capital once the facility has drawn", () => {
-    const facility = toFacility(data({ principal: 9n * U, seniorAssets: 9n * U, seniorTotalShares: 9n * U }), { seniorShares: 0n, juniorShares: 0n });
+    const facility = toFacility(data({ principal: 9n * U, dueAt: 1_900_000_000n, seniorAssets: 9n * U, seniorTotalShares: 9n * U }), { seniorShares: 0n, juniorShares: 0n });
     expect(facility.available).toBe(0);
   });
 

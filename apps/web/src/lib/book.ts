@@ -83,7 +83,7 @@ export function stageOf(data: FacilityData): Stage {
   }
   if (data.statusName === "Closed") return hasHolders ? "repaid" : "settled";
   if (data.statusName === "Late") return "late";
-  if (data.principal > 0n) return "drawn";
+  if (data.dueAt > 0n) return "drawn";
   return hasHolders ? "funded" : "open";
 }
 
