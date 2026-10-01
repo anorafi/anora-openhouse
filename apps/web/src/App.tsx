@@ -78,7 +78,7 @@ function Shell() {
                 market={facilityAsMarket(selected, symbol)}
                 onBack={() => navigate("markets")}
                 onApprove={(amount) => approve(selected.id, amount)}
-                onSupply={(amount) => supply(selected.id, amount)}
+                onSupply={(amount, tranche) => supply(selected.id, amount, tranche)}
                 onDone={() => navigate("portfolio")}
               />
               : <p className="empty-state">Choose a facility from Markets.</p>)}

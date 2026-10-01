@@ -6,7 +6,7 @@ import type { MarketAction } from "../lib/book";
 import { facilityAsMarket, owedOn, useBook, useMoney, type Facility } from "../state/book";
 
 export type MarketStatus = "Open" | "Funding" | "Active" | "Late" | "Paused" | "Repaid" | "Settled" | "Defaulted" | "Recovered" | "Closed";
-export type Market = { id: Address; name: string; type: string; route: string; company: string; icon: string; asset: string; status: MarketStatus; targetReturn: string; available: string; duration: string; reserve: string; seniorPct: number; juniorPct: number; funded: number; accepting: boolean; fundingLabel: string; action: MarketAction };
+export type Market = { id: Address; name: string; type: string; route: string; company: string; icon: string; asset: string; status: MarketStatus; targetReturn: string; available: string; duration: string; reserve: string; firstLossPct: number; seniorPct: number; juniorPct: number; seniorSupplied: number; juniorSupplied: number; seniorAvailable: number; juniorAvailable: number; feePct: number; seniorFeeShareBps: number; funded: number; accepting: boolean; fundingLabel: string; action: MarketAction };
 
 const categories = ["All", "Export receivables", "Supply-chain finance", "Commodity finance"];
 type TabVariant = "all" | "export" | "supply" | "commodity";
