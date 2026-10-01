@@ -102,9 +102,11 @@ describe("toFacility", () => {
     expect(facility.durationLabel).toBe("3 minutes");
   });
 
-  it("offers only what senior capacity allows, since junior is not sold", () => {
+  it("offers senior up to its capacity and junior up to the credit limit", () => {
     const facility = toFacility(data(), { seniorShares: 0n, juniorShares: 0n });
-    expect(facility.available).toBe(13.5);
+    expect(facility.seniorAvailable).toBe(13.5);
+    expect(facility.juniorAvailable).toBe(20);
+    expect(facility.available).toBe(20);
     expect(facility.reservePct).toBe(30);
   });
 
@@ -139,15 +141,16 @@ describe("waterfallOf", () => {
 describe("provider view of a facility", () => {
   const open = toFacility(data(), { seniorShares: 0n, juniorShares: 0n });
 
-  it("labels the asset and treats every provider dollar as senior, since junior is not sold", () => {
+  it("labels the asset and reads the tranche split from the contract terms", () => {
     expect(toFacility(data(), { seniorShares: 0n, juniorShares: 0n }, undefined, "USDG").asset).toBe("USDG");
     expect(open.asset).toBe("USDC");
-    expect(open.juniorPct).toBe(0);
-    expect(open.seniorPct).toBe(70);
+    expect(open.firstLossPct).toBe(30);
+    expect(open.juniorPct).toBeCloseTo(0.769, 2);
+    expect(open.seniorPct).toBeCloseTo(69.231, 2);
   });
 
   it("measures funding against what the contract still accepts", () => {
-    expect(fundingState(open)).toMatchObject({ accepting: true, available: 13.5, percent: 0, label: "0% funded" });
+    expect(fundingState(open)).toMatchObject({ accepting: true, available: 20, percent: 0, label: "0% funded" });
     const half = { ...open, supplied: 6.75, available: 6.75 };
     expect(fundingState(half)).toMatchObject({ accepting: true, percent: 50, label: "50% funded" });
   });
@@ -192,5 +195,38 @@ describe("draftSizeFor", () => {
 
   it("keeps drafts small when the asset is real money", () => {
     expect(draftSizeFor(false)).toEqual({ min: 10, max: 20, step: 1 });
+  });
+});
+
+describe("tranche availability", () => {
+  const open = (overrides: Partial<FacilityData> = {}) => toFacility(data({ terms: { ...data().terms, limit: 10n * U, firstLoss: 3n * U, capitalCap: 10n * U }, firstLossReserve: 3n * U, totalCapital: 3n * U, seniorCapacity: 6_750_000n, ...overrides }), { seniorShares: 0n, juniorShares: 0n });
+
+  it("offers senior up to the ratio and junior up to the remaining capital cap", () => {
+    const facility = open();
+    expect(facility.seniorAvailable).toBe(6.75);
+    expect(facility.juniorAvailable).toBe(7);
+    expect(facility.available).toBe(7);
+  });
+
+  it("closes both tranches once the facility stops accepting capital", () => {
+    const facility = open({ ...withStatus("Late"), dueAt: 100n });
+    expect(facility.seniorAvailable).toBe(0);
+    expect(facility.juniorAvailable).toBe(0);
+  });
+
+  it("raises senior capacity after junior arrives and never lets the cap be exceeded", () => {
+    const facility = open({ juniorAssets: 1n * U, juniorTotalShares: 1n * U, totalCapital: 4n * U, seniorCapacity: 9_000_000n });
+    expect(facility.seniorAvailable).toBe(6);
+    expect(facility.juniorAvailable).toBe(6);
+  });
+
+  it("reads the structure from the contract data instead of a fixed senior only split", () => {
+    const empty = open();
+    expect(empty.juniorPct).toBeGreaterThan(0);
+    expect(empty.firstLossPct).toBeCloseTo(30, 6);
+    expect(empty.seniorPct + empty.juniorPct + empty.firstLossPct).toBeCloseTo(100, 6);
+    const funded = open({ juniorAssets: 2n * U, juniorTotalShares: 2n * U, totalCapital: 5n * U, seniorCapacity: 11_250_000n });
+    expect(funded.juniorPct).toBeCloseTo(20, 6);
+    expect(funded.juniorSupplied).toBe(2);
   });
 });

@@ -17,6 +17,7 @@ import { encodeFacilityName, type Listing } from "../lib/facilityName";
 import { FAUCET_AMOUNT, faucetVisible } from "../lib/faucet";
 import { guardedWrite } from "../lib/guardedWrite";
 import { depositedBy, eventsFrom, totalsFrom, type BookEvent } from "../lib/history";
+import { trancheIndex, type Tranche } from "../lib/tranche";
 import { FACILITY_DEFAULTS, GRACE_PRESETS, TENOR_PRESETS, defaultTerms, type Terms } from "../lib/terms";
 
 export type { Facility, Stage } from "../lib/book";
@@ -74,7 +75,7 @@ interface BookValue {
   faucet: () => Promise<void>;
   approve: (spender: Address, amount: number) => Promise<void>;
   createFacility: (input: NewFacility) => Promise<void>;
-  supply: (id: Address, amount: number) => Promise<void>;
+  supply: (id: Address, amount: number, tranche: Tranche) => Promise<void>;
   draw: (id: Address) => Promise<void>;
   repay: (id: Address) => Promise<void>;
   claim: (id: Address) => Promise<void>;
@@ -171,9 +172,9 @@ export function BookProvider({ children }: { children: ReactNode }) {
     await send({ ...assetContract(deployment.asset), chainId, functionName: "mint", args: [me, toUnits(FAUCET_AMOUNT)] });
   }, [chainId, deployment, me, send]);
 
-  const supply = useCallback(async (id: Address, amount: number) => {
+  const supply = useCallback(async (id: Address, amount: number, tranche: Tranche) => {
     await approveUnits(id, toUnits(amount));
-    await send({ ...facilityContract(id), chainId, functionName: "deposit", args: [SENIOR, toUnits(amount)] });
+    await send({ ...facilityContract(id), chainId, functionName: "deposit", args: [trancheIndex(tranche), toUnits(amount)] });
     setLatestSupplyId(id);
   }, [approveUnits, chainId, send]);
 
@@ -283,8 +284,15 @@ export function facilityAsMarket(facility: Facility, symbol: string): Market {
     available: funding.available.toLocaleString("en-US", { maximumFractionDigits: 2 }),
     duration: facility.durationLabel,
     reserve: `${facility.reservePct.toFixed(1)}%`,
+    firstLossPct: facility.firstLossPct,
     seniorPct: facility.seniorPct,
     juniorPct: facility.juniorPct,
+    seniorSupplied: facility.seniorSupplied,
+    juniorSupplied: facility.juniorSupplied,
+    seniorAvailable: facility.seniorAvailable,
+    juniorAvailable: facility.juniorAvailable,
+    feePct: facility.feePct,
+    seniorFeeShareBps: facility.seniorFeeShareBps,
     funded: funding.percent,
     accepting: funding.accepting,
     fundingLabel: funding.label,

@@ -735,3 +735,10 @@ progress::-moz-progress-bar { background: var(--fill); border-radius: 999px; }
 .preset-row button { padding: 4px 10px; color: var(--muted); background: transparent; border: 1px solid var(--line-strong); border-radius: 999px; font-size: 12px; }
 .preset-row button.active { color: var(--ink); border-color: var(--ink); }
 .unit-select { flex-shrink: 0; padding: 0; color: var(--muted); background: transparent; border: 0; font-size: inherit; }
+.tranche-picker { display: flex; gap: 6px; margin: 4px 0 12px; }
+.tranche-picker button { flex: 1; padding: 7px 10px; color: var(--muted); background: transparent; border: 1px solid var(--line-strong); border-radius: 10px; font-size: 13px; }
+.tranche-picker button.active { color: var(--ink); border-color: var(--ink); font-weight: 600; }
+.tranche-picker button:disabled { opacity: 0.45; cursor: not-allowed; }
+.tranche-note { margin: -4px 0 12px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.position-tranche { color: var(--muted); font-weight: 400; }
+.tranche-template > p em { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; font-style: normal; }

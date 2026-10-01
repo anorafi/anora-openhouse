@@ -5,6 +5,7 @@ import { FilterBar, presentOptions } from "./FilterBar";
 import { FaucetButton } from "./FaucetButton";
 import { useDeployment } from "../hooks/useDeployment";
 import { useTx } from "../hooks/useTx";
+import { trancheStructure, type TrancheStructure as Structure } from "../lib/tranche";
 import { FACILITY_DEFAULTS, GRACE_PRESETS, TENOR_PRESETS, defaultTerms, termsLabel, termsValid, toSeconds, unitsFor, type TenorUnit } from "../lib/terms";
 import { fundingState, DEFAULT_STAGES, ORIGINATOR_ACTION, STAGE_LABEL, eventTime, isMine, owedOn, waterfallOf, randomDraft, useBook, useDraftSize, useMoney, type BookEvent, type Facility, type Stage } from "../state/book";
 
@@ -332,7 +333,7 @@ export function FacilityDetail({ facility, onBack }: { facility: Facility; onBac
         </dl>
 
         <div className="detail-section">
-          <TrancheStructure total={facility.limit} asset={facility.asset} seniorPct={facility.seniorPct} juniorPct={facility.juniorPct} reservePct={facility.reservePct} />
+          <TrancheStructure total={facility.limit} asset={facility.asset} structure={trancheStructure({ limit: facility.limit, firstLoss: facility.firstLoss, seniorPerJuniorBps: facility.seniorPerJuniorBps, seniorAssets: facility.seniorSupplied, juniorAssets: facility.juniorSupplied })} />
         </div>
 
         <div className="detail-section">
@@ -409,20 +410,21 @@ function LockIcon() {
   </svg>;
 }
 
-function TrancheStructure({ total, asset, seniorPct, juniorPct, reservePct }: {
-  total: number; asset: string; seniorPct: number; juniorPct: number; reservePct: number;
-}) {
+function TrancheStructure({ total, asset, structure }: { total: number; asset: string; structure: Structure }) {
+  const { seniorPct, juniorPct, firstLossPct } = structure;
   const layers = [
     ["Senior", seniorPct],
     ["Junior", juniorPct],
-    ["First-loss", reservePct],
+    ["First-loss", firstLossPct],
   ] as const;
+  const supplied = structure.seniorSupplied > 0 || structure.juniorSupplied > 0;
   return <div className="tranche-template">
-    <header><div><strong>Risk structure</strong><small>Senior only, Junior is not offered yet</small></div><span>100% allocated</span></header>
-    <div className="tranche-bar" aria-label={`Senior ${seniorPct.toFixed(1)}%, Junior ${juniorPct.toFixed(1)}%, first-loss ${reservePct.toFixed(1)}%`}>
+    <header><div><strong>Risk structure</strong><small>Senior capacity follows Junior and first-loss</small></div><span>{Math.round(seniorPct + juniorPct + firstLossPct)}% allocated</span></header>
+    <div className="tranche-bar" aria-label={`Senior ${seniorPct.toFixed(1)}%, Junior ${juniorPct.toFixed(1)}%, first-loss ${firstLossPct.toFixed(1)}%`}>
       {layers.map(([label, percentage]) => <i key={label} title={`${label} ${percentage.toFixed(1)}%`} style={{ width: `${percentage}%` }} />)}
     </div>
     <dl>{layers.map(([label, percentage]) => <div key={label}><dt>{label}</dt><dd>{percentage.toFixed(1)}%</dd><small><TokenAmount value={total * percentage / 100} asset={asset} /></small></div>)}</dl>
+    {supplied && <p><span>Supplied</span><em>Senior <TokenAmount value={structure.seniorSupplied} asset={asset} /> · Junior <TokenAmount value={structure.juniorSupplied} asset={asset} /></em></p>}
     <p><span>Losses</span> First-loss → Junior → Senior</p>
     <p><span>Recoveries</span> Senior → Junior → First-loss</p>
   </div>;
@@ -446,7 +448,7 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
   const feeValue = toNumber(form.feePct);
   const minFirstLoss = (limitValue * MIN_FIRST_LOSS_BPS) / 10_000;
   const reservePct = limitValue > 0 ? (firstLossValue / limitValue) * 100 : 0;
-  const seniorPct = Math.max(0, 100 - reservePct);
+  const draftStructure = trancheStructure({ limit: limitValue, firstLoss: firstLossValue, seniorPerJuniorBps: FACILITY_DEFAULTS.seniorPerJuniorBps, seniorAssets: 0, juniorAssets: 0 });
   const meetsFloor = firstLossValue >= minFirstLoss && firstLossValue > 0;
   const affordable = firstLossValue <= balance;
   const canOpen = form.name.trim() !== "" && form.company.trim() !== "" && limitValue > 0 && meetsFloor && reservePct < 100 && affordable && termsValid(form) && !!factory;
@@ -507,7 +509,7 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
         <p className="balance-row"><span>Protocol floor ({MIN_FIRST_LOSS_BPS / 100}%)</span><strong><TokenAmount value={minFirstLoss} asset={symbol} /></strong></p>
         <p className="balance-row"><span>Wallet balance</span><strong><TokenAmount value={balance} asset={symbol} /></strong></p>
         <FaucetButton />
-        <TrancheStructure total={limitValue} asset={symbol} seniorPct={seniorPct} juniorPct={0} reservePct={reservePct} />
+        <TrancheStructure total={limitValue} asset={symbol} structure={draftStructure} />
         <div className="field-pair">
           <label>Financing fee<div className="amount-input"><input inputMode="decimal" value={form.feePct} onChange={(e) => set("feePct")(e.target.value)} /><span>%</span></div></label>
           <label>Duration<div className="amount-input"><input inputMode="numeric" value={form.duration} onChange={(e) => set("duration")(e.target.value.replace(/\D/g, ""))} />{units.length > 1
