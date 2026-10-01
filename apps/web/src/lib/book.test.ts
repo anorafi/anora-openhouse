@@ -59,10 +59,16 @@ describe("units", () => {
 });
 
 describe("durationText", () => {
-  it("reads demo tenors in minutes and real ones in days", () => {
-    expect(durationText(180)).toBe("3 min");
+  it("spells out the unit for minutes, hours, and days", () => {
+    expect(durationText(180)).toBe("3 minutes");
     expect(durationText(7_200)).toBe("2 hours");
     expect(durationText(90 * 86_400)).toBe("90 days");
+  });
+
+  it("uses the singular for one", () => {
+    expect(durationText(60)).toBe("1 minute");
+    expect(durationText(3_600)).toBe("1 hour");
+    expect(durationText(86_400)).toBe("1 day");
   });
 });
 
@@ -93,7 +99,7 @@ describe("toFacility", () => {
     expect(facility.company).toBe("PT Teh");
     expect(facility.feePct).toBe(5);
     expect(facility.targetReturn).toBe(3);
-    expect(facility.durationLabel).toBe("3 min");
+    expect(facility.durationLabel).toBe("3 minutes");
   });
 
   it("offers only what senior capacity allows, since junior is not sold", () => {
