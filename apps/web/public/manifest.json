@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "defaultChainId": 421614,
-  "gitCommit": "375c02f",
+  "defaultChainId": 4663,
+  "gitCommit": "e404d57",
   "networks": [
     {
       "chainId": 421614,
@@ -28,10 +28,10 @@
         "faucet": true
       },
       "contracts": {
-        "factory": "0x9F356D8eEf33a04F2F0628B80441D3Ed8Ebd4B52",
-        "facilityImplementation": "0x5Ecc49dAD8AC9d00C13Ec8D48A9880e468DbEC54"
+        "factory": "0x6D051e17Be86CC7e3f24AbAf1393028c5B800c83",
+        "facilityImplementation": "0x12Dab014335a7ACC9AF893dA7eeB3868aE0dDED0"
       },
-      "deploymentBlock": "314232309",
+      "deploymentBlock": "314581264",
       "features": {
         "writes": true,
         "gaslessOriginator": false,
@@ -63,10 +63,10 @@
         "faucet": false
       },
       "contracts": {
-        "factory": "0x6CcDaf026fB01d0138570a87D9D226Dd9f6B6155",
-        "facilityImplementation": "0x9ba982307554A0c34F35eCEe79eCA5DE872f3A12"
+        "factory": "0x2Db15442C0242c5A0498E6Ff58a37e86E2d63692",
+        "facilityImplementation": "0x39FBFC504a70a40687a08e20c781f47934450909"
       },
-      "deploymentBlock": "76365416",
+      "deploymentBlock": "77237144",
       "features": {
         "writes": true,
         "gaslessOriginator": false,
