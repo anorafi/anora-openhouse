@@ -741,3 +741,4 @@ progress::-moz-progress-bar { background: var(--fill); border-radius: 999px; }
 .tranche-picker button:disabled { opacity: 0.45; cursor: not-allowed; }
 .tranche-note { margin: -4px 0 12px; color: var(--muted); font-size: 12px; line-height: 1.4; }
 .position-tranche { color: var(--muted); font-weight: 400; }
+.tranche-template > p em { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; font-style: normal; }

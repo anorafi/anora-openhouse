@@ -424,7 +424,7 @@ function TrancheStructure({ total, asset, structure }: { total: number; asset: s
       {layers.map(([label, percentage]) => <i key={label} title={`${label} ${percentage.toFixed(1)}%`} style={{ width: `${percentage}%` }} />)}
     </div>
     <dl>{layers.map(([label, percentage]) => <div key={label}><dt>{label}</dt><dd>{percentage.toFixed(1)}%</dd><small><TokenAmount value={total * percentage / 100} asset={asset} /></small></div>)}</dl>
-    {supplied && <p><span>Supplied</span> Senior <TokenAmount value={structure.seniorSupplied} asset={asset} />, Junior <TokenAmount value={structure.juniorSupplied} asset={asset} /></p>}
+    {supplied && <p><span>Supplied</span><em>Senior <TokenAmount value={structure.seniorSupplied} asset={asset} /> · Junior <TokenAmount value={structure.juniorSupplied} asset={asset} /></em></p>}
     <p><span>Losses</span> First-loss → Junior → Senior</p>
     <p><span>Recoveries</span> Senior → Junior → First-loss</p>
   </div>;
