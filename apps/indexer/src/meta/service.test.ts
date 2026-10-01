@@ -241,7 +241,9 @@ describe("documents", () => {
     await send(slot.uploadUrl, { method: "PUT", body: pdf });
     const listed = await json(await send(`${F}/documents`));
     const url: string = listed.items[0].url;
-    expect((await send(url.replace(/sig=[0-9a-f]/, "sig=0"))).status).toBe(403);
+    const tampered = url.replace(/sig=([0-9a-f])/, (_, first: string) => `sig=${first === "0" ? "1" : "0"}`);
+    expect(tampered).not.toBe(url);
+    expect((await send(tampered)).status).toBe(403);
     time += 1000;
     expect((await send(url)).status).toBe(403);
   });
