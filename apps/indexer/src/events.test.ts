@@ -40,6 +40,26 @@ describe("normalizeLog", () => {
     expect(event.data.name).toBe("Thailand Rice Shipment 37");
   });
 
+  test("records the frozen model terms against the new facility", () => {
+    const snapshot = "0x" + "ab".repeat(32);
+    const log = makeLog(
+      "TermsFrozen",
+      { facility: FACILITY, modelVersion: 1n, snapshotHash: snapshot, seniorPerJuniorBps: 21_880n, capitalCap: 9_564_257n },
+      { address: FACTORY, blockNumber: 51 },
+    );
+    const event = normalizeLog(4663, log)!;
+    expect(event.event).toBe("TermsFrozen");
+    expect(event.facility).toBe(FACILITY.toLowerCase());
+    expect(event.actor).toBeNull();
+    expect(event.data).toEqual({
+      facility: FACILITY.toLowerCase(),
+      modelVersion: "1",
+      snapshotHash: snapshot,
+      seniorPerJuniorBps: "21880",
+      capitalCap: "9564257",
+    });
+  });
+
   test("keeps admin events on the factory address", () => {
     const log = makeLog("OriginatorApprovalChanged", { originator: ORIGINATOR, approved: true }, { address: FACTORY, blockNumber: 60 });
     const event = normalizeLog(421614, log)!;

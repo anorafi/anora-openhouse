@@ -19,6 +19,7 @@ export interface FacilitySummary {
   outstandingPrincipal: string;
   outstandingLoss: string;
   repaid: { principal: string; fee: string };
+  model: { version: string; snapshotHash: string; seniorPerJuniorBps: string; capitalCap: string } | null;
   createdBlock: string;
   sourceBlock: string;
 }
@@ -45,6 +46,7 @@ export function deriveFacility(events: IndexedEvent[], nowSeconds: number): Faci
   const sorted = [...events].sort(order);
   const created = sorted.find((e) => e.event === "FacilityCreated");
   if (!created) return null;
+  const frozen = sorted.find((e) => e.event === "TermsFrozen");
   let senior = 0n;
   let junior = 0n;
   let outSenior = 0n;
@@ -109,6 +111,14 @@ export function deriveFacility(events: IndexedEvent[], nowSeconds: number): Faci
     outstandingPrincipal: outstandingPrincipal.toString(),
     outstandingLoss: outstandingLoss.toString(),
     repaid: { principal: repaidPrincipal.toString(), fee: repaidFee.toString() },
+    model: frozen
+      ? {
+          version: String(frozen.data.modelVersion ?? "0"),
+          snapshotHash: String(frozen.data.snapshotHash ?? ""),
+          seniorPerJuniorBps: String(frozen.data.seniorPerJuniorBps ?? "0"),
+          capitalCap: String(frozen.data.capitalCap ?? "0"),
+        }
+      : null,
     createdBlock: created.blockNumber,
     sourceBlock: last.blockNumber,
   };
