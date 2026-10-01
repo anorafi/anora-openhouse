@@ -67,3 +67,25 @@ Senior deposits above the facility's calculated cap already revert (`SeniorCapac
 - `seniorFeeShareBps` and the late-fee rate are still fixed values in the UI, not derived from the model.
 - The grace-start rule (`dueAt` or `markLate`) is unchanged.
 - No new UI to explain a blocked listing: the open button stays disabled.
+
+## Rollout
+
+The model-aware factories are deployed beside production and are not in the published manifest. Nothing changes for users until the steps below are applied.
+
+| Chain | Factory | Implementation | Deployment block |
+|---|---|---|---|
+| Arbitrum Sepolia | `0x803dB6d7581405a24209487Eb23c274Fd31Ec8BA` | `0x0E8B610C21d27CEA6409c724f6C9c4F7a219778F` | 314678558 |
+| Robinhood | `0x80A71bb4715F2dCAea8cDa57FC3f6C297b9E742B` | `0xf437d4072067C1225c7ebF14E9291222a260F3fD` | 77485575 |
+
+The same addresses are in `contracts/deployments.ano41.json`. On both, the demo originator is approved and the dedicated risk agent is set.
+
+Switching, in order:
+
+1. `bun apps/web/scripts/apply-ano41.ts` merges `deployments.ano41.json` into `deployments.json` and keeps the current factory as `previousFactory`. Pass `arbitrumSepolia` or `robinhood` to switch one chain only.
+2. Re-seed the demo on the new factory (`docs/demo.md`). Facilities of the old factory are not read by the web app once the manifest points to the new one.
+3. Restart the indexer and the keeper (`systemctl --user restart anora-indexer anora-keeper`) so they read the new factory. The keeper already reacts to `Drawn` events from any facility, and it marked a facility of the new factory late during the chain test.
+4. Build and publish the web app with `RISK_MODEL=1` to use the calculator, or without it to keep the 2.25x rule while using the new factory (the factory's `createFacility` is unchanged).
+
+Rollback is not switching: the production manifest keeps pointing at the current factories, and the new ones stay unused. After a switch, rollback is the same script run with the previous addresses, plus a re-publish.
+
+Chain test (Arbitrum Sepolia, scripted wallets): `apps/web/scripts/ano41-e2e.ts` runs 19 checks (legacy create, create with model, frozen snapshot equal to the calculator hash, Senior over the limit reverts, Junior withdrawal that breaks protection reverts, a safe withdrawal succeeds, repaid cycle leaves the facility empty, default and recovery are never blocked, gas). On Robinhood the same script (`MODE=cycle`) runs one small cycle with real USDG and the wallet total is unchanged. Gas of `createFacilityWithModel` is about 595k against 547k for `createFacility`.
