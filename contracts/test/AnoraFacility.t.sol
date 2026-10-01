@@ -510,4 +510,55 @@ contract AnoraFacilityTest is Test {
         emit AnoraFactory.OriginatorApprovalChanged(stranger, true);
         factory.setOriginatorApproved(stranger, true);
     }
+
+    function test_juniorOnlyFacilityLeavesNoStuckAssetsAfterRepayAndClaim() public {
+        AnoraFacility f = _open();
+        vm.prank(junior1);
+        f.deposit(AnoraFacility.Tranche.Junior, 60_000 * USDC);
+        vm.prank(originator);
+        f.drawdown(50_000 * USDC);
+        vm.prank(originator);
+        f.repay(51_000 * USDC);
+
+        assertEq(usdc.balanceOf(address(f)), f.seniorAssets() + f.juniorAssets() + f.firstLossReserve());
+        assertEq(f.seniorAssets(), 0);
+        assertEq(f.juniorAssets(), 61_000 * USDC);
+
+        vm.prank(junior1);
+        f.withdraw(AnoraFacility.Tranche.Junior, 60_000 * USDC);
+
+        assertEq(usdc.balanceOf(junior1), 1_000_000 * USDC + 1_000 * USDC);
+        assertEq(usdc.balanceOf(address(f)), 0);
+    }
+
+    function test_assetBalanceEqualsTrackedCapitalAfterEveryOperation() public {
+        AnoraFacility f = _open();
+        _assertTracked(f);
+        vm.prank(junior1);
+        f.deposit(AnoraFacility.Tranche.Junior, 60_000 * USDC);
+        _assertTracked(f);
+        vm.prank(senior1);
+        f.deposit(AnoraFacility.Tranche.Senior, 100_000 * USDC);
+        _assertTracked(f);
+        vm.prank(originator);
+        f.drawdown(80_000 * USDC);
+        assertEq(usdc.balanceOf(address(f)) + f.principal(), f.seniorAssets() + f.juniorAssets() + f.firstLossReserve());
+        vm.prank(originator);
+        f.repay(40_000 * USDC);
+        assertEq(usdc.balanceOf(address(f)) + f.principal(), f.seniorAssets() + f.juniorAssets() + f.firstLossReserve());
+        vm.prank(originator);
+        f.repay(41_600 * USDC);
+        _assertTracked(f);
+        vm.prank(senior1);
+        f.withdraw(AnoraFacility.Tranche.Senior, 100_000 * USDC);
+        _assertTracked(f);
+        vm.prank(junior1);
+        f.withdraw(AnoraFacility.Tranche.Junior, 60_000 * USDC);
+        _assertTracked(f);
+        assertEq(usdc.balanceOf(address(f)), 0);
+    }
+
+    function _assertTracked(AnoraFacility f) internal view {
+        assertEq(usdc.balanceOf(address(f)), f.seniorAssets() + f.juniorAssets() + f.firstLossReserve());
+    }
 }
