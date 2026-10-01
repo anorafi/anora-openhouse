@@ -77,7 +77,8 @@ export async function syncChain(client: ChainClient, db: Db, net: SyncNetwork, o
   const head = await client.getBlockNumber();
   await rollbackReorgs(client, db, net, head, options.reorgWindow);
   const cursor = db.cursor(net.chainId);
-  let next = cursor === null ? net.deploymentBlock : cursor + 1n;
+  const rescanFrom = cursor === null ? net.deploymentBlock : cursor + 1n - options.reorgWindow;
+  let next = rescanFrom > net.deploymentBlock ? rescanFrom : net.deploymentBlock;
   let chunk = options.chunk;
   let failures = 0;
   while (next <= head) {

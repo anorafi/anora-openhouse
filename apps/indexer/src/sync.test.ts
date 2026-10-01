@@ -76,7 +76,7 @@ describe("syncChain", () => {
     chain.calls = [];
     await syncChain(chain, db, network, options);
     expect(db.events({ chainId: 421614 })).toHaveLength(2);
-    expect(chain.calls).toHaveLength(0);
+    expect(Math.max(...chain.calls.map((call) => Number(call.to)))).toBe(140);
   });
 
   test("picks up only new blocks on the next run", async () => {
@@ -88,6 +88,28 @@ describe("syncChain", () => {
     const state = await syncChain(chain, db, network, options);
     expect(state.indexedBlock).toBe(160n);
     expect(db.events({ chainId: 421614 })).toHaveLength(2);
+  });
+
+  test("picks up a log that the node could not serve yet when the cursor first passed it", async () => {
+    chain.logs = [created(101)];
+    chain.head = 120n;
+    await syncChain(chain, db, network, options);
+    const late = deposited(118, 1);
+    chain.logs.push(late);
+    chain.head = 125n;
+    const state = await syncChain(chain, db, network, options);
+    expect(db.events({ chainId: network.chainId }).some((event) => Number(event.blockNumber) === 118)).toBe(true);
+    expect(state.indexedBlock).toBe(125n);
+  });
+
+  test("rescans only the trailing window, not the whole history", async () => {
+    chain.logs = [created(101)];
+    chain.head = 400n;
+    await syncChain(chain, db, network, options);
+    chain.calls = [];
+    chain.head = 410n;
+    await syncChain(chain, db, network, options);
+    expect(Math.min(...chain.calls.map((call) => Number(call.from)))).toBe(400 - 64 + 1);
   });
 
   test("rolls back a block whose hash changed and indexes the replacement", async () => {
