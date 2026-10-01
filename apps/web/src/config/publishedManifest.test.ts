@@ -10,8 +10,8 @@ describe("published manifest", () => {
     expect(manifest.schemaVersion).toBe(1);
   });
 
-  it("serves Arbitrum Sepolia by default with a faucet asset", () => {
-    expect(manifest.defaultChainId).toBe(421614);
+  it("defaults to Robinhood Chain and keeps Arbitrum Sepolia enabled with a faucet asset", () => {
+    expect(manifest.defaultChainId).toBe(4663);
     const deployment = deploymentOf(networkFor(manifest, 421614)!);
     expect(deployment.assetSymbol).toBe("TestUSDC");
     expect(deployment.faucet).toBe(true);
