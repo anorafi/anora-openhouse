@@ -6,8 +6,9 @@ import { FaucetButton } from "./FaucetButton";
 import { useDeployment } from "../hooks/useDeployment";
 import { useTx } from "../hooks/useTx";
 import { trancheStructure, type TrancheStructure as Structure } from "../lib/tranche";
+import { planFacility } from "../lib/facilityPlan";
 import { FACILITY_DEFAULTS, GRACE_PRESETS, TENOR_PRESETS, defaultTerms, termsLabel, termsValid, toSeconds, unitsFor, type TenorUnit } from "../lib/terms";
-import { fundingState, DEFAULT_STAGES, ORIGINATOR_ACTION, STAGE_LABEL, eventTime, isMine, owedOn, waterfallOf, randomDraft, useBook, useDraftSize, useMoney, type BookEvent, type Facility, type Stage } from "../state/book";
+import { fundingState, DEFAULT_STAGES, ORIGINATOR_ACTION, STAGE_LABEL, eventTime, isMine, owedOn, waterfallOf, randomDraft, useBook, useDraftSize, useMoney, useRiskModel, type BookEvent, type Facility, type Stage } from "../state/book";
 
 /** Protocol-level floor, mirroring minFirstLossBps on the factory. */
 const MIN_FIRST_LOSS_BPS = 1_000;
@@ -434,6 +435,7 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
   const { approve, createFacility, facilities, factory, symbol, balance } = useBook();
   const usd = useMoney();
   const size = useDraftSize();
+  const risk = useRiskModel();
   const units = unitsFor(useDeployment()?.faucet);
   const tx = useTx();
   const [form, setForm] = useState(() => randomDraft(facilities.map((facility) => facility.name), size));
@@ -448,11 +450,20 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
   const feeValue = toNumber(form.feePct);
   const minFirstLoss = (limitValue * MIN_FIRST_LOSS_BPS) / 10_000;
   const reservePct = limitValue > 0 ? (firstLossValue / limitValue) * 100 : 0;
-  const draftStructure = trancheStructure({ limit: limitValue, firstLoss: firstLossValue, seniorPerJuniorBps: FACILITY_DEFAULTS.seniorPerJuniorBps, seniorAssets: 0, juniorAssets: 0 });
+  const plan = planFacility({
+    ...risk,
+    limit: limitValue,
+    firstLoss: firstLossValue,
+    financingType: form.type,
+    route: form.route,
+    tenorSeconds: toSeconds(toNumber(form.duration), form.unit),
+    graceSeconds: toSeconds(toNumber(form.grace), form.unit),
+  });
+  const draftStructure = trancheStructure({ limit: limitValue, firstLoss: firstLossValue, seniorPerJuniorBps: plan.seniorPerJuniorBps, seniorAssets: 0, juniorAssets: 0 });
   const meetsFloor = firstLossValue >= minFirstLoss && firstLossValue > 0;
   const affordable = firstLossValue <= balance;
-  const canOpen = form.name.trim() !== "" && form.company.trim() !== "" && limitValue > 0 && meetsFloor && reservePct < 100 && affordable && termsValid(form) && !!factory;
-  const seniorOpen = Math.max(0, Math.min(limitValue - firstLossValue, firstLossValue * FACILITY_DEFAULTS.seniorPerJuniorBps / 10_000));
+  const canOpen = form.name.trim() !== "" && form.company.trim() !== "" && limitValue > 0 && meetsFloor && reservePct < 100 && affordable && termsValid(form) && !!factory && !plan.blocked;
+  const seniorOpen = plan.seniorOpen;
 
   const next = async () => {
     if (phase === "approve") {

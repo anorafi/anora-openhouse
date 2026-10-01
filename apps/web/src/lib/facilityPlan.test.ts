@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { FACILITY_DEFAULTS } from "./terms";
 import { toUnits } from "./book";
-import { planFacility, type FacilityPlanInput } from "./facilityPlan";
+import { createFacilityCall, planFacility, type FacilityPlanInput } from "./facilityPlan";
 
 const base: FacilityPlanInput = {
   riskModel: false,
@@ -80,5 +80,45 @@ describe("planFacility with the risk model on", () => {
     expect(plan.blocked).toBe(false);
     expect(plan.seniorOpen).toBe(0);
     expect(plan.seniorPerJuniorBps).toBe(0);
+  });
+});
+
+describe("createFacilityCall", () => {
+  const terms = {
+    limit: toUnits(10),
+    firstLoss: toUnits(3),
+    tenor: 90n * 86_400n,
+    grace: 14n * 86_400n,
+    financingFeeBps: 500n,
+    lateFeePerDayBps: 10n,
+    seniorFeeShareBps: 6_000n,
+  };
+
+  test("with the model off it calls the original createFacility with the original terms", () => {
+    const call = createFacilityCall("Name", terms, planFacility(base));
+    expect(call.functionName).toBe("createFacility");
+    expect(call.args).toHaveLength(2);
+    const sent = call.args[1] as Record<string, bigint>;
+    expect(sent.seniorPerJuniorBps).toBe(22_500n);
+    expect(sent.capitalCap).toBe(toUnits(10));
+  });
+
+  test("with the model on it calls createFacilityWithModel with the version and the snapshot hash", () => {
+    const plan = planFacility({ ...base, riskModel: true });
+    const call = createFacilityCall("Name", terms, plan);
+    expect(call.functionName).toBe("createFacilityWithModel");
+    expect(call.args).toHaveLength(4);
+    const sent = call.args[1] as Record<string, bigint>;
+    expect(sent.seniorPerJuniorBps).toBe(BigInt(plan.seniorPerJuniorBps));
+    expect(sent.capitalCap).toBe(plan.capitalCap);
+    expect(call.args[2]).toBe(1n);
+    expect(call.args[3]).toBe(plan.snapshotHash);
+  });
+
+  test("the terms never carry fields the contract does not know", () => {
+    const call = createFacilityCall("Name", terms, planFacility({ ...base, riskModel: true }));
+    expect(Object.keys(call.args[1] as object).sort()).toEqual([
+      "capitalCap", "financingFeeBps", "firstLoss", "grace", "lateFeePerDayBps", "limit", "seniorFeeShareBps", "seniorPerJuniorBps", "tenor",
+    ]);
   });
 });

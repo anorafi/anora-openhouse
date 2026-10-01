@@ -58,3 +58,21 @@ export function planFacility(input: FacilityPlanInput): FacilityPlan {
     reason: plan.reason,
   };
 }
+
+export interface BaseTerms {
+  limit: bigint;
+  firstLoss: bigint;
+  tenor: bigint;
+  grace: bigint;
+  financingFeeBps: bigint;
+  lateFeePerDayBps: bigint;
+  seniorFeeShareBps: bigint;
+}
+
+export function createFacilityCall(name: string, base: BaseTerms, plan: FacilityPlan) {
+  const terms = { ...base, seniorPerJuniorBps: BigInt(plan.seniorPerJuniorBps), capitalCap: plan.capitalCap };
+  if (plan.modelVersion > 0 && plan.snapshotHash) {
+    return { functionName: "createFacilityWithModel" as const, args: [name, terms, BigInt(plan.modelVersion), plan.snapshotHash] as const };
+  }
+  return { functionName: "createFacility" as const, args: [name, terms] as const };
+}
