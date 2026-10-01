@@ -16,7 +16,7 @@ const network = (overrides: Partial<ManifestNetwork> = {}): ManifestNetwork => (
   asset: { address: address(1) as `0x${string}`, symbol: "TestUSDC", decimals: 6, faucet: true },
   contracts: { factory: address(2) as `0x${string}`, facilityImplementation: address(3) as `0x${string}` },
   deploymentBlock: "1",
-  features: { writes: true, gaslessOriginator: false, duneAnalytics: false },
+  features: { writes: true, gaslessOriginator: false, duneAnalytics: false, riskModel: false },
   ...overrides,
 });
 

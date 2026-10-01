@@ -56,6 +56,24 @@ describe("parseManifest", () => {
     expect(() => parseManifest(manifest({ networks: [network({ publicRpcUrl: "ftp://x" })] }))).toThrow(/publicRpcUrl/);
   });
 
+  it("treats the risk model as off when the manifest does not mention it", () => {
+    const parsed = parseManifest(manifest());
+    expect(parsed.networks[0].features.riskModel).toBe(false);
+    expect(deploymentOf(parsed.networks[0]).riskModel).toBe(false);
+  });
+
+  it("reads the risk model flag per network", () => {
+    const withFlag = network({ features: { writes: true, gaslessOriginator: false, duneAnalytics: false, riskModel: true } });
+    const parsed = parseManifest(manifest({ networks: [withFlag, robinhood()] }));
+    expect(deploymentOf(parsed.networks[0]).riskModel).toBe(true);
+    expect(deploymentOf(parsed.networks[1]).riskModel).toBe(false);
+  });
+
+  it("rejects a risk model flag that is not a boolean", () => {
+    const bad = network({ features: { writes: true, gaslessOriginator: false, duneAnalytics: false, riskModel: "yes" } });
+    expect(() => parseManifest(manifest({ networks: [bad] }))).toThrow(/riskModel/);
+  });
+
   it("rejects anything that is not an object", () => {
     expect(() => parseManifest(null)).toThrow(ManifestError);
     expect(() => parseManifest("nope")).toThrow(ManifestError);
@@ -153,6 +171,7 @@ describe("deploymentOf", () => {
       explorer: "https://sepolia.arbiscan.io",
       confirmations: 2,
       writes: true,
+      riskModel: false,
       deploymentBlock: 19434064n,
       logsApi: undefined,
       indexerApi: undefined,
