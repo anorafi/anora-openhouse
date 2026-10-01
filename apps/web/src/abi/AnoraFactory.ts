@@ -35,6 +35,19 @@ export const AnoraFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "MAX_SENIOR_PER_JUNIOR_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "acceptOwnership",
     "inputs": [],
     "outputs": [],
@@ -145,6 +158,87 @@ export const AnoraFactoryAbi = [
             "internalType": "uint256"
           }
         ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "facility",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "createFacilityWithModel",
+    "inputs": [
+      {
+        "name": "name",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "terms",
+        "type": "tuple",
+        "internalType": "struct AnoraFacility.Terms",
+        "components": [
+          {
+            "name": "limit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "firstLoss",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "tenor",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "grace",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "financingFeeBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "lateFeePerDayBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "seniorPerJuniorBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "seniorFeeShareBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "capitalCap",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "modelVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "snapshotHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
@@ -485,6 +579,43 @@ export const AnoraFactoryAbi = [
         "type": "address",
         "indexed": true,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TermsFrozen",
+    "inputs": [
+      {
+        "name": "facility",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "modelVersion",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "snapshotHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "seniorPerJuniorBps",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "capitalCap",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
