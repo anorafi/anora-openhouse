@@ -19,6 +19,7 @@ contract AnoraFactory is Ownable2Step, Pausable {
     error ZeroAddress();
 
     uint256 public constant BPS = 10_000;
+    uint256 public constant MAX_SENIOR_PER_JUNIOR_BPS = 100_000;
 
     address public immutable implementation;
     IERC20 public immutable asset;
@@ -29,6 +30,9 @@ contract AnoraFactory is Ownable2Step, Pausable {
 
     event FacilityCreated(
         address indexed facility, address indexed originator, string name, uint256 limit, uint256 firstLoss
+    );
+    event TermsFrozen(
+        address indexed facility, uint256 modelVersion, bytes32 snapshotHash, uint256 seniorPerJuniorBps, uint256 capitalCap
     );
     event RiskAgentChanged(address indexed previous, address indexed next);
     event MinFirstLossChanged(uint256 previousBps, uint256 nextBps);
@@ -56,17 +60,35 @@ contract AnoraFactory is Ownable2Step, Pausable {
         whenNotPaused
         returns (address facility)
     {
+        facility = _open(name, terms);
+        AnoraFacility(facility).initialize(address(asset), msg.sender, name, terms);
+    }
+
+    /// @notice Same as createFacility, and freezes the model version and snapshot hash the terms were calculated from.
+    function createFacilityWithModel(
+        string calldata name,
+        AnoraFacility.Terms calldata terms,
+        uint256 modelVersion,
+        bytes32 snapshotHash
+    ) external whenNotPaused returns (address facility) {
+        if (modelVersion == 0 || snapshotHash == bytes32(0)) revert InvalidTerms();
+        facility = _open(name, terms);
+        AnoraFacility(facility).initializeWithModel(address(asset), msg.sender, name, terms, modelVersion, snapshotHash);
+        emit TermsFrozen(facility, modelVersion, snapshotHash, terms.seniorPerJuniorBps, terms.capitalCap);
+    }
+
+    function _open(string calldata name, AnoraFacility.Terms calldata terms) internal returns (address facility) {
         if (!approvedOriginators[msg.sender]) revert OriginatorNotApproved();
         if (
             terms.limit == 0 || terms.tenor == 0 || terms.firstLoss > terms.limit || terms.capitalCap < terms.firstLoss
                 || terms.financingFeeBps > BPS || terms.lateFeePerDayBps > BPS || terms.seniorFeeShareBps > BPS
+                || terms.seniorPerJuniorBps > MAX_SENIOR_PER_JUNIOR_BPS
         ) revert InvalidTerms();
         if (terms.firstLoss < terms.limit * minFirstLossBps / BPS) revert FirstLossTooSmall();
         facility = Clones.clone(implementation);
         facilities.push(facility);
         emit FacilityCreated(facility, msg.sender, name, terms.limit, terms.firstLoss);
         asset.safeTransferFrom(msg.sender, facility, terms.firstLoss);
-        AnoraFacility(facility).initialize(address(asset), msg.sender, name, terms);
     }
 
     function setRiskAgent(address next) external onlyOwner {
