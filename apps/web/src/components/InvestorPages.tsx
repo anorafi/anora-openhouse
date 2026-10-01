@@ -1,4 +1,5 @@
 import { repaymentProjection } from "../lib/repaymentProjection";
+import { FaucetButton } from "./FaucetButton";
 import { TokenAmount } from "./TokenAmount";
 import { useMemo, useState, type CSSProperties } from "react";
 import type { Market } from "./Markets";
@@ -141,6 +142,7 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
           <p className="panel-copy">Provide capital to earn a {market.targetReturn} target return.</p>
           <label>Asset<select><option>{market.asset}</option></select></label>
           <p className="balance-row"><span>Wallet balance</span><strong>{me ? <TokenAmount value={balance} asset={market.asset} /> : "Connect a wallet"}</strong></p>
+          <FaucetButton />
           <label>Amount<AmountInput value={amount} onChange={setAmount} suffix={market.asset} action={<button onClick={() => setAmount(String(Math.min(balance, availableValue)))}>Max</button>} /></label>
           <dl className="supply-totals"><div><dt>Estimated repayment</dt><dd><TokenAmount value={repayment} asset={market.asset} /></dd></div><div><dt>Estimated return</dt><dd><TokenAmount value={Math.max(0, repayment - value)} asset={market.asset} /></dd></div></dl>
           {value > 0 && value > availableValue && <p className="facility-warn">Only <TokenAmount value={availableValue} asset={market.asset} /> is open to supply.</p>}
