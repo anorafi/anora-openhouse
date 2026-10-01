@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "defaultChainId": 421614,
+  "gitCommit": "375c02f",
+  "networks": [
+    {
+      "chainId": 421614,
+      "key": "arbitrum-sepolia",
+      "name": "Arbitrum Sepolia",
+      "enabled": true,
+      "rpcUrl": "https://anora-api.dimsky.xyz/rpc/421614",
+      "publicRpcUrl": "https://sepolia-rollup.arbitrum.io/rpc",
+      "explorerUrl": "https://sepolia.arbiscan.io",
+      "confirmations": 2,
+      "nativeCurrency": {
+        "name": "Ether",
+        "symbol": "ETH",
+        "decimals": 18
+      },
+      "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
+      "alchemyHost": "arb-sepolia",
+      "logsApi": "https://arbitrum-sepolia.blockscout.com/api/v2",
+      "indexerApi": "https://anora-api.dimsky.xyz",
+      "asset": {
+        "address": "0x38513243bA873d05b8b1E6622fE12e7685E4eAc6",
+        "symbol": "TestUSDC",
+        "decimals": 6,
+        "faucet": true
+      },
+      "contracts": {
+        "factory": "0x9F356D8eEf33a04F2F0628B80441D3Ed8Ebd4B52",
+        "facilityImplementation": "0x5Ecc49dAD8AC9d00C13Ec8D48A9880e468DbEC54"
+      },
+      "deploymentBlock": "314232309",
+      "features": {
+        "writes": true,
+        "gaslessOriginator": false,
+        "duneAnalytics": false
+      }
+    },
+    {
+      "chainId": 4663,
+      "key": "robinhood",
+      "name": "Robinhood Chain",
+      "enabled": true,
+      "rpcUrl": "https://anora-api.dimsky.xyz/rpc/4663",
+      "publicRpcUrl": "https://rpc.mainnet.chain.robinhood.com",
+      "explorerUrl": "https://robinhoodchain.blockscout.com",
+      "confirmations": 2,
+      "nativeCurrency": {
+        "name": "Ether",
+        "symbol": "ETH",
+        "decimals": 18
+      },
+      "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
+      "alchemyHost": "robinhood-mainnet",
+      "logsApi": "https://robinhoodchain.blockscout.com/api/v2",
+      "indexerApi": "https://anora-api.dimsky.xyz",
+      "asset": {
+        "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+        "symbol": "USDG",
+        "decimals": 6,
+        "faucet": false
+      },
+      "contracts": {
+        "factory": "0x6CcDaf026fB01d0138570a87D9D226Dd9f6B6155",
+        "facilityImplementation": "0x9ba982307554A0c34F35eCEe79eCA5DE872f3A12"
+      },
+      "deploymentBlock": "76365416",
+      "features": {
+        "writes": true,
+        "gaslessOriginator": false,
+        "duneAnalytics": false
+      }
+    }
+  ]
+}

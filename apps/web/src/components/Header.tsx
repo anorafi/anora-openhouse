@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useAccount, useChainId, useConnect, useDisconnect, useSwitchChain } from "wagmi";
-import { arbitrumSepolia } from "wagmi/chains";
-import { robinhood } from "../config/wagmi";
+import { orderedNetworks } from "../config/chains";
+import { useManifest } from "../config/ManifestContext";
 import { useIsRiskAgent } from "../hooks/useFactory";
 import { shortenAddress } from "../lib/format";
-
-const SELECTABLE_CHAINS = [{ id: robinhood.id, name: "Robinhood Chain" }, { id: arbitrumSepolia.id, name: "Arbitrum Sepolia" }];
 
 /** Close an open popover when the next click lands outside it. */
 function useDismiss(open: boolean, setOpen: (open: boolean) => void) {
@@ -29,39 +27,24 @@ function Chevron() {
   );
 }
 
-export function Header({ onReset }: { onReset: () => void }) {
+export function Header() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { connect, connectors, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const isRiskAgent = useIsRiskAgent(address);
-  const currentChain = SELECTABLE_CHAINS.find((chain) => chain.id === chainId);
+  const manifest = useManifest();
+  const selectableChains = orderedNetworks(manifest).map((network) => ({ id: network.chainId, name: network.name }));
+  const currentChain = selectableChains.find((chain) => chain.id === chainId);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useDismiss(menuOpen, setMenuOpen);
-  const [resetOpen, setResetOpen] = useState(false);
-  const resetRef = useDismiss(resetOpen, setResetOpen);
 
   const injectedConnector = connectors.find((c) => c.type === "injected") ?? connectors[0];
 
   return (
     <header className="header">
       <div className="header-actions">
-        <div className="reset-select" ref={resetRef}>
-          <button type="button" className="reset-button" onClick={() => setResetOpen((open) => !open)} aria-haspopup="menu" aria-expanded={resetOpen}>
-            Reset
-          </button>
-          {resetOpen && (
-            <div className="reset-menu" role="menu">
-              <strong>Reset the demo</strong>
-              <p>Clears everything you have supplied, drawn, repaid, claimed, and opened, and restores the book a first-time visitor sees.</p>
-              <div className="reset-actions">
-                <button role="menuitem" className="secondary-button" onClick={() => setResetOpen(false)}>Cancel</button>
-                <button role="menuitem" className="primary-button" onClick={() => { onReset(); setResetOpen(false); }}>Reset</button>
-              </div>
-            </div>
-          )}
-        </div>
         <div className="network-select" ref={menuRef}>
           <button type="button" className="network-current" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={menuOpen}>
             <span className="network-dot" aria-hidden="true" />
@@ -70,7 +53,7 @@ export function Header({ onReset }: { onReset: () => void }) {
           </button>
           {menuOpen && (
             <div className="network-menu" role="menu">
-              {SELECTABLE_CHAINS.filter((chain) => chain.id !== chainId).map((chain) => (
+              {selectableChains.filter((chain) => chain.id !== chainId).map((chain) => (
                 <button
                   key={chain.id}
                   role="menuitem"

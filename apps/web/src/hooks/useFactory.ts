@@ -2,8 +2,8 @@ import type { Address } from "viem";
 import { useChainId, useReadContract } from "wagmi";
 import { factoryContract, ZERO_ADDRESS } from "../config/contracts";
 import { useFactoryAddress } from "./useDeployment";
+import { CHAIN_POLL_MS } from "../config/polling";
 
-const REFETCH_MS = 5_000;
 
 export function useAllFacilityAddresses() {
   const chainId = useChainId();
@@ -14,7 +14,7 @@ export function useAllFacilityAddresses() {
     ...factory,
     functionName: "allFacilities",
     chainId,
-    query: { enabled: !!factoryAddress, refetchInterval: REFETCH_MS },
+    query: { enabled: !!factoryAddress, refetchInterval: CHAIN_POLL_MS },
   });
 }
 
@@ -40,7 +40,7 @@ export function useRiskAgent() {
     ...factory,
     functionName: "riskAgent",
     chainId,
-    query: { enabled: !!factoryAddress, refetchInterval: REFETCH_MS },
+    query: { enabled: !!factoryAddress, refetchInterval: CHAIN_POLL_MS },
   });
 }
 

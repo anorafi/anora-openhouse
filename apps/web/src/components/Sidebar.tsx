@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Page, Role } from "../App";
-import { useDemo, ORIGINATOR_ACTION } from "../state/demo";
+import { isMine, useBook, ORIGINATOR_ACTION } from "../state/book";
 
 type IconName = "markets" | "portfolio" | "activity" | "facilities" | "open" | "chevron";
 
@@ -71,7 +71,7 @@ export function Sidebar({
   onNavigate: (page: Page) => void;
   onHome: () => void;
 }) {
-  const { facilities } = useDemo();
+  const { facilities, me } = useBook();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -88,8 +88,8 @@ export function Sidebar({
   // Dot the role that actually has a pending step, so the demo says when to
   // switch instead of leaving you to work it out.
   const waiting: Record<Role, boolean> = {
-    originator: facilities.some((facility) => ORIGINATOR_ACTION[facility.stage] !== null),
-    investor: facilities.some((facility) => facility.stage === "open" || facility.stage === "repaid" || facility.stage === "recovered"),
+    originator: facilities.some((facility) => isMine(facility, me) && ORIGINATOR_ACTION[facility.stage] !== null),
+    investor: facilities.some((facility) => facility.available > 0 || (facility.holding.value > 0 && (facility.stage === "repaid" || facility.stage === "recovered"))),
   };
 
   return (

@@ -1,10 +1,12 @@
 import { TokenAmount } from "./TokenAmount";
 import { useMemo, useState } from "react";
 import { FilterBar, presentOptions } from "./FilterBar";
-import { facilityAsMarket, owedOn, useDemo, marketAction, type Facility } from "../state/demo";
+import type { Address } from "viem";
+import type { MarketAction } from "../lib/book";
+import { facilityAsMarket, owedOn, useBook, useMoney, type Facility } from "../state/book";
 
-export type MarketStatus = "Open" | "Funding" | "Active" | "Paused" | "Repaid" | "Settled" | "Defaulted" | "Recovered" | "Closed";
-export type Market = { name: string; type: string; route: string; company: string; icon: string; asset: string; status: MarketStatus; targetReturn: string; available: string; duration: string; reserve: string; seniorPct: number; juniorPct: number; funded: number; accepting: boolean; fundingLabel: string; action: ReturnType<typeof marketAction> };
+export type MarketStatus = "Open" | "Funding" | "Active" | "Late" | "Paused" | "Repaid" | "Settled" | "Defaulted" | "Recovered" | "Closed";
+export type Market = { id: Address; name: string; type: string; route: string; company: string; icon: string; asset: string; status: MarketStatus; targetReturn: string; available: string; duration: string; reserve: string; seniorPct: number; juniorPct: number; funded: number; accepting: boolean; fundingLabel: string; action: MarketAction };
 
 const categories = ["All", "Export receivables", "Supply-chain finance", "Commodity finance"];
 type TabVariant = "all" | "export" | "supply" | "commodity";
@@ -62,7 +64,7 @@ function MarketsBackdrop() {
   );
 }
 
-const STATUS_ORDER = ["Open", "Funding", "Active", "Paused", "Repaid", "Settled", "Defaulted", "Recovered", "Closed"];
+const STATUS_ORDER = ["Open", "Funding", "Active", "Late", "Paused", "Repaid", "Settled", "Defaulted", "Recovered", "Closed"];
 
 /** Duration buckets, tested against the facility's real term. */
 const DURATIONS: Array<{ label: string; holds: (facility: Facility) => boolean }> = [
@@ -72,8 +74,6 @@ const DURATIONS: Array<{ label: string; holds: (facility: Facility) => boolean }
   { label: "Over 90 days", holds: (facility) => facility.durationDays > 90 },
 ];
 
-const usdM = (value: number) => `$${(value / 1_000_000).toFixed(2)}M`;
-
 export function Markets({ onReview, onPortfolio, onHistory }: { onReview: (market: Market) => void; onPortfolio: () => void; onHistory: () => void }) {
   const openMarket = (market: Market) => {
     if (market.action === "Funding closed") return;
@@ -81,7 +81,8 @@ export function Markets({ onReview, onPortfolio, onHistory }: { onReview: (marke
     if (market.action === "View position" || market.action === "Claim funds") return onPortfolio();
     onReview(market);
   };
-  const { facilities } = useDemo();
+  const { facilities, symbol } = useBook();
+  const money = useMoney();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [status, setStatus] = useState("All");
@@ -91,10 +92,10 @@ export function Markets({ onReview, onPortfolio, onHistory }: { onReview: (marke
   // Every market is one of the originator's facilities, so the list and the
   // summary are both derived rather than restated.
   // Each row keeps its facility so filters test real numbers, not label text.
-  const rows = useMemo(() => facilities.map((facility) => ({ facility, market: facilityAsMarket(facility) })), [facilities]);
+  const rows = useMemo(() => facilities.map((facility) => ({ facility, market: facilityAsMarket(facility, symbol) })), [facilities, symbol]);
   const summary = useMemo(() => ({
     supplied: facilities.reduce((sum, f) => sum + f.supplied, 0),
-    outstanding: facilities.filter((f) => f.stage === "drawn").reduce((sum, f) => sum + owedOn(f), 0),
+    outstanding: facilities.filter((f) => (f.stage === "drawn" || f.stage === "late")).reduce((sum, f) => sum + owedOn(f), 0),
     repaid: facilities.reduce((sum, f) => sum + f.repaid, 0),
     active: facilities.filter((f) => f.stage !== "settled" && f.stage !== "closed").length,
   }), [facilities]);
@@ -112,8 +113,8 @@ export function Markets({ onReview, onPortfolio, onHistory }: { onReview: (marke
   return <section className="markets-page">
     <MarketsBackdrop />
     <dl className="market-summary">
-      <div><dt>Capital supplied</dt><dd>{usdM(summary.supplied)}</dd></div><div><dt>Outstanding</dt><dd>{usdM(summary.outstanding)}</dd></div>
-      <div><dt>Repaid</dt><dd>{usdM(summary.repaid)}</dd></div><div><dt>Active facilities</dt><dd>{summary.active}</dd></div>
+      <div><dt>Capital supplied</dt><dd>{money(summary.supplied)}</dd></div><div><dt>Outstanding</dt><dd>{money(summary.outstanding)}</dd></div>
+      <div><dt>Repaid</dt><dd>{money(summary.repaid)}</dd></div><div><dt>Active facilities</dt><dd>{summary.active}</dd></div>
     </dl>
     <div className="markets-heading">
       <div><h1>Markets</h1><p>Supply capital to isolated trade-finance facilities.</p></div>
@@ -133,10 +134,10 @@ export function Markets({ onReview, onPortfolio, onHistory }: { onReview: (marke
       ]}
     />
     {view === "grid"
-      ? <div className="market-cards">{visible.map(({ market }) => <MarketCard key={market.name} market={market} onReview={openMarket} />)}</div>
+      ? <div className="market-cards">{visible.map(({ market }) => <MarketCard key={market.id} market={market} onReview={openMarket} />)}</div>
       : <div className="market-list">
           <div className="market-list-head" aria-hidden="true"><span>Opportunity</span><span>Type</span><span>Route</span><span>Company</span><span>Target return</span><span>Available</span><span>Utilized</span><span>Duration</span><span /></div>
-          {visible.map(({ market }) => <MarketListRow key={market.name} market={market} onReview={openMarket} />)}
+          {visible.map(({ market }) => <MarketListRow key={market.id} market={market} onReview={openMarket} />)}
         </div>}
     {visible.length === 0 && <p className="empty-state">No opportunities match these filters.</p>}
     <p className="market-note"><span aria-hidden="true">ⓘ</span> Each market is isolated. Performance and losses do not transfer between facilities.</p>

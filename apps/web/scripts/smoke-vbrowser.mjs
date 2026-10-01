@@ -1,56 +1,54 @@
+import { mkdirSync } from "node:fs";
 import { getWindow } from "/home/dims/.local/lib/vpsbrowser/browser.mjs";
-import { createPublicClient, createWalletClient, http } from "viem";
+import { createPublicClient, createWalletClient, defineChain, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { arbitrumSepolia } from "viem/chains";
-import { defineChain } from "viem";
 
 const robinhood = defineChain({
   id: 4663,
   name: "Robinhood Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: { default: { http: ["https://rpc.mainnet.chain.robinhood.com"] } },
+  rpcUrls: { default: { http: [process.env.ROBINHOOD_RPC ?? "https://rpc.mainnet.chain.robinhood.com"] } },
 });
 
 const url = process.env.SMOKE_URL ?? "https://openhouse.anora.finance/";
 const shotDir = process.env.SMOKE_SHOTS ?? "/home/dims/.cache/claude-work/smoke";
-const chain = process.env.SMOKE_CHAIN === "robinhood" ? robinhood : arbitrumSepolia;
-const rpc = chain === robinhood ? robinhood.rpcUrls.default.http[0] : process.env.ARBITRUM_SEPOLIA_RPC;
-const unit = BigInt(process.env.SMOKE_UNIT ?? (chain === robinhood ? "1" : "1000"));
-const amount = (n) => (BigInt(n) * unit).toString();
-const account = privateKeyToAccount(process.env.DEPLOYER_PRIVATE_KEY);
-const transport = http(rpc);
-const publicClient = createPublicClient({ chain, transport });
-const walletClient = createWalletClient({ account, chain, transport });
-const chainIdHex = "0x" + chain.id.toString(16);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const paths = (process.env.SMOKE_PATHS ?? "repaid,default").split(",");
+const transport = http(robinhood.rpcUrls.default.http[0]);
+const publicClient = createPublicClient({ chain: robinhood, transport });
+const wallets = {
+  investor: privateKeyToAccount(process.env.DEMO_INVESTOR_PRIVATE_KEY),
+  originator: privateKeyToAccount(process.env.DEMO_ORIGINATOR_PRIVATE_KEY),
+  risk: privateKeyToAccount(process.env.RISK_AGENT_PRIVATE_KEY),
+};
+let current = wallets.originator;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+mkdirSync(shotDir, { recursive: true });
 
 async function walletRequest(method, params) {
   switch (method) {
     case "eth_requestAccounts":
     case "eth_accounts":
-      return [account.address];
+      return [current.address];
     case "eth_chainId":
-      return chainIdHex;
+      return "0x" + robinhood.id.toString(16);
     case "wallet_switchEthereumChain":
     case "wallet_addEthereumChain":
       return null;
     case "eth_sendTransaction": {
       const tx = params[0];
-      return walletClient.sendTransaction({
-        to: tx.to,
-        data: tx.data,
-        value: tx.value ? BigInt(tx.value) : undefined,
-        gas: tx.gas ? BigInt(tx.gas) : undefined,
-      });
+      const client = createWalletClient({ account: current, chain: robinhood, transport });
+      return client.sendTransaction({ to: tx.to, data: tx.data, value: tx.value ? BigInt(tx.value) : undefined, gas: tx.gas ? BigInt(tx.gas) : undefined });
     }
     case "personal_sign":
-      return account.signMessage({ message: { raw: params[0] } });
+      return current.signMessage({ message: { raw: params[0] } });
     default:
       return publicClient.request({ method, params });
   }
 }
 
 const { page } = await getWindow(process.env.VBROWSER_AGENT ?? "smoke");
+await page.setViewport({ width: 1440, height: 900 });
+await page.emulateTimezone(process.env.SMOKE_TZ ?? "Asia/Jakarta");
 await page.exposeFunction("__walletRequest", async (method, params) => {
   const result = await walletRequest(method, params);
   return JSON.parse(JSON.stringify(result, (_, v) => (typeof v === "bigint" ? "0x" + v.toString(16) : v)));
@@ -60,11 +58,12 @@ await page.evaluateOnNewDocument(() => {
   const provider = {
     isMetaMask: true,
     request: ({ method, params }) => window.__walletRequest(method, params ?? []),
-    on: (e, fn) => ((listeners[e] ??= []).push(fn), provider),
-    removeListener: (e, fn) => ((listeners[e] = (listeners[e] ?? []).filter((f) => f !== fn)), provider),
+    on: (event, fn) => ((listeners[event] ??= []).push(fn), provider),
+    removeListener: (event, fn) => ((listeners[event] = (listeners[event] ?? []).filter((f) => f !== fn)), provider),
   };
   window.ethereum = provider;
-  const info = { uuid: "5f1c2a2e-0000-4000-8000-000000000001", name: "Smoke Wallet", icon: "data:image/svg+xml,", rdns: "xyz.dimsky.smoke" };
+  window.__emitWallet = (event, arg) => (listeners[event] ?? []).forEach((fn) => fn(arg));
+  const info = { uuid: "5f1c2a2e-0000-4000-8000-000000000001", name: "Demo Wallet", icon: "data:image/svg+xml,", rdns: "xyz.dimsky.demo" };
   const announce = () => window.dispatchEvent(new CustomEvent("eip6963:announceProvider", { detail: Object.freeze({ info, provider }) }));
   window.addEventListener("eip6963:requestProvider", announce);
   announce();
@@ -73,335 +72,196 @@ await page.evaluateOnNewDocument(() => {
 let step = 0;
 async function shot(name) {
   step += 1;
+  await sleep(1_500);
   const file = `${shotDir}/${String(step).padStart(2, "0")}-${name}.png`;
   await page.screenshot({ path: file, fullPage: true });
   console.log(`shot ${file}`);
 }
 
-async function clickButton(text, { timeout = 60_000 } = {}) {
+async function until(check, what, timeout = 120_000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    const clicked = await page.evaluate((t) => {
-      const btn = [...document.querySelectorAll("button")].find((b) => b.innerText.trim() === t && !b.disabled);
-      if (!btn) return false;
-      btn.click();
-      return true;
-    }, text);
-    if (clicked) {
-      console.log(`click ${text}`);
-      return;
+    if (await page.evaluate(check.fn, check.arg)) return;
+    await sleep(1_000);
+  }
+  throw new Error(`timed out: ${what}`);
+}
+
+const hasText = (text) => ({ fn: (t) => document.body.innerText.toLowerCase().includes(t.toLowerCase()), arg: text });
+const buttonReady = (text) => ({ fn: (t) => [...document.querySelectorAll("button")].some((b) => b.innerText.trim() === t && !b.disabled), arg: text });
+
+async function waitForText(text, timeout) { await until(hasText(text), `text "${text}"`, timeout); }
+
+async function click(text, timeout) {
+  await until(buttonReady(text), `button "${text}"`, timeout);
+  await page.evaluate((t) => [...document.querySelectorAll("button")].find((b) => b.innerText.trim() === t && !b.disabled).click(), text);
+  console.log(`click ${text}`);
+}
+
+async function clickCard(selector, name) {
+  await until({ fn: ([s, n]) => [...document.querySelectorAll(s)].some((c) => c.innerText.includes(n)), arg: [selector, name] }, `card ${name}`);
+  await page.evaluate(([s, n]) => [...document.querySelectorAll(s)].find((c) => c.innerText.includes(n)).click(), [selector, name]);
+  console.log(`open ${name}`);
+}
+
+async function fill(labelText, value) {
+  await page.evaluate(([labelText, value]) => {
+    const label = [...document.querySelectorAll("label")].find((l) => l.innerText.trim().startsWith(labelText));
+    const input = label?.querySelector("input, textarea");
+    if (!input) throw new Error(`no input under ${labelText}`);
+    const proto = input.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value").set.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }, [labelText, value]);
+}
+
+async function actAs(role, workspace) {
+  current = wallets[role];
+  await page.evaluate((address) => window.__emitWallet("accountsChanged", [address]), current.address);
+  await waitForText(current.address.slice(0, 6));
+  if (workspace) {
+    const already = await page.evaluate((w) => document.querySelector(".workspace-current")?.innerText.trim() === w, workspace);
+    if (!already) {
+      await click("Switch role");
+      await page.evaluate((w) => [...document.querySelectorAll('[role="menuitemradio"]')].find((b) => b.innerText.includes(w)).click(), workspace);
     }
-    await sleep(500);
   }
-  throw new Error(`button not clickable: ${text}`);
+  console.log(`as ${role} ${current.address}`);
 }
 
-async function waitForButton(text, { timeout = 120_000 } = {}) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const ok = await page.evaluate((t) => [...document.querySelectorAll("button")].some((b) => b.innerText.trim() === t && !b.disabled), text);
-    if (ok) return;
-    await sleep(500);
-  }
-  throw new Error(`button never enabled: ${text}`);
+async function go(label) {
+  await page.evaluate((l) => [...document.querySelectorAll(".side-nav button")].find((b) => b.innerText.trim() === l).click(), label);
+  await sleep(1_000);
 }
 
-async function waitForText(text, { timeout = 120_000 } = {}) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    if (await page.evaluate((t) => document.body.innerText.toLowerCase().includes(t.toLowerCase()), text)) return;
-    await sleep(500);
-  }
-  throw new Error(`text never appeared: ${text}`);
+async function openFacility(tag, terms) {
+  await actAs("originator", "Originator");
+  await go("Open a facility");
+  await waitForText("Facility terms");
+  await fill("Credit limit", terms.limit);
+  await fill("First-loss stake", terms.firstLoss);
+  await fill("Financing fee", terms.fee);
+  await fill("Duration", terms.duration);
+  await fill("Grace before default", terms.grace);
+  const name = await page.evaluate(() => [...document.querySelectorAll("label")].find((l) => l.innerText.startsWith("Facility name")).querySelector("input").value);
+  await shot(`${tag}-terms`);
+  await click("Approve USDG");
+  await click("Clone facility and lock first-loss");
+  await waitForText("Listed in Markets");
+  await shot(`${tag}-listed`);
+  return name;
 }
 
-async function setInput(selector, value, { index = 0 } = {}) {
-  await page.evaluate(
-    ({ selector, value, index }) => {
-      const el = document.querySelectorAll(selector)[index];
-      if (!el) throw new Error(`no element ${selector}[${index}]`);
-      const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-      Object.getOwnPropertyDescriptor(proto, "value").set.call(el, value);
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-    },
-    { selector, value, index },
-  );
-}
-
-async function setLabeledInput(labelText, value) {
-  await page.evaluate(
-    ({ labelText, value }) => {
-      const label = [...document.querySelectorAll("label")].find((l) => l.innerText.trim().startsWith(labelText));
-      const el = label?.querySelector("input");
-      if (!el) throw new Error(`no input under label ${labelText}`);
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, value);
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-    },
-    { labelText, value },
-  );
-}
-
-async function setSelect(index, value) {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    if (await page.evaluate((i) => document.querySelectorAll("select").length > i, index)) break;
-    await sleep(500);
-  }
-  await page.evaluate(
-    ({ index, value }) => {
-      const el = document.querySelectorAll("select")[index];
-      if (!el) throw new Error(`no select at index ${index}`);
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(el, value);
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-    },
-    { index, value },
-  );
-}
-
-async function checkAllBoxes() {
+async function supply(tag, name, amount) {
+  await actAs("investor", "Capital provider");
+  await go("Markets");
+  await clickCard(".market-card", name);
+  await waitForText("Review supply");
   await page.evaluate(() => {
-    document.querySelectorAll('.review-check input[type="checkbox"]').forEach((el) => {
-      if (!el.checked) el.click();
-    });
+    const input = [...document.querySelectorAll("label")].find((l) => l.innerText.trim().startsWith("Amount")).querySelector("input");
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
   });
+  await fill("Amount", amount);
+  await shot(`${tag}-market`);
+  await click("Review supply");
+  await page.evaluate(() => document.querySelectorAll('.review-check input[type="checkbox"]').forEach((box) => box.checked || box.click()));
+  await click("Approve USDG");
+  await click("Supply capital");
+  await waitForText("Position created");
+  await shot(`${tag}-supplied`);
+  await click("View portfolio");
+  await waitForText(name);
 }
 
-async function waitForCard(cardText, { timeout = 60_000 } = {}) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const ok = await page.evaluate(
-      (t) => [...document.querySelectorAll(".card, .market-card")].some((c) => c.innerText.includes(t)),
-      cardText,
-    );
-    if (ok) return;
-    await sleep(1_000);
-  }
-  throw new Error(`card never appeared: ${cardText}`);
+async function manage(name) {
+  await actAs("originator", "Originator");
+  await go("My facilities");
+  await clickCard(".facility-row", name);
+  await waitForText("Lifecycle");
 }
 
-async function scopedClick(cardText, buttonText, { timeout = 60_000 } = {}) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const clicked = await page.evaluate(
-      ({ cardText, buttonText }) => {
-        const card = [...document.querySelectorAll(".card, .market-card")].find((c) => c.innerText.includes(cardText));
-        if (!card) return false;
-        const btn = [...card.querySelectorAll("button")].find((b) => b.innerText.trim() === buttonText && !b.disabled);
-        if (!btn) return false;
-        btn.click();
-        return true;
-      },
-      { cardText, buttonText },
-    );
-    if (clicked) {
-      console.log(`click [${cardText}] ${buttonText}`);
-      return;
-    }
-    await sleep(500);
-  }
-  throw new Error(`button not clickable in card "${cardText}": ${buttonText}`);
+async function draw(tag, name) {
+  await manage(name);
+  await click("Review drawdown");
+  await click("Draw liquidity");
+  await waitForText("Repay facility");
+  await shot(`${tag}-drawn`);
 }
 
-async function scopedHasEnabledButton(cardText, buttonText) {
-  return page.evaluate(
-    ({ cardText, buttonText }) => {
-      const card = [...document.querySelectorAll(".card, .market-card")].find((c) => c.innerText.includes(cardText));
-      if (!card) return false;
-      return [...card.querySelectorAll("button")].some((b) => b.innerText.trim() === buttonText && !b.disabled);
-    },
-    { cardText, buttonText },
-  );
+async function claim(tag, name) {
+  await actAs("investor", "Capital provider");
+  await go("Portfolio");
+  await until({ fn: (n) => [...document.querySelectorAll(".table-row")].some((r) => r.innerText.includes(n) && r.innerText.includes("Claim")), arg: name }, `claim ready on ${name}`);
+  await shot(`${tag}-claimable`);
+  await page.evaluate((n) => [...document.querySelectorAll(".table-row")].find((r) => r.innerText.includes(n)).querySelector("button").click(), name);
+  await until({ fn: (n) => ![...document.querySelectorAll(".table-row")].some((r) => r.innerText.includes(n)), arg: name }, `position closed on ${name}`);
+  await shot(`${tag}-claimed`);
 }
 
-async function scopedWaitForButton(cardText, buttonText, { timeout = 120_000 } = {}) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    if (await scopedHasEnabledButton(cardText, buttonText)) return;
-    await sleep(2_000);
-  }
-  throw new Error(`button never enabled in card "${cardText}": ${buttonText}`);
-}
-
-async function scopedWaitUntilGone(cardText, text, { timeout = 120_000 } = {}) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const stillThere = await page.evaluate(
-      ({ cardText, text }) => {
-        const card = [...document.querySelectorAll(".card, .market-card")].find((c) => c.innerText.includes(cardText));
-        return !!card && card.innerText.includes(text);
-      },
-      { cardText, text },
-    );
-    if (!stillThere) return;
-    await sleep(1_000);
-  }
-  throw new Error(`text never left card "${cardText}": ${text}`);
-}
-
-async function scopedWaitForText(cardText, text, { timeout = 120_000 } = {}) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const ok = await page.evaluate(
-      ({ cardText, text }) => {
-        const card = [...document.querySelectorAll(".card, .market-card")].find((c) => c.innerText.includes(cardText));
-        return !!card && card.innerText.toLowerCase().includes(text.toLowerCase());
-      },
-      { cardText, text },
-    );
-    if (ok) return;
-    await sleep(1_000);
-  }
-  throw new Error(`text never appeared in card "${cardText}": ${text}`);
-}
-
-async function scopedSetInput(cardText, selector, value) {
-  await page.evaluate(
-    ({ cardText, selector, value }) => {
-      const card = [...document.querySelectorAll(".card, .market-card")].find((c) => c.innerText.includes(cardText));
-      if (!card) throw new Error(`card not found: ${cardText}`);
-      const el = card.querySelector(selector);
-      if (!el) throw new Error(`no element ${selector} in card ${cardText}`);
-      const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-      Object.getOwnPropertyDescriptor(proto, "value").set.call(el, value);
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-    },
-    { cardText, selector, value },
-  );
-}
-
-async function pageText() {
-  return page.evaluate(() => document.body.innerText);
-}
-
-const fmt = (n) => Number(amount(n)).toLocaleString("en-US");
-const tenorMinutes = Number(process.env.SMOKE_TENOR_MIN ?? "2");
-const graceMinutes = Number(process.env.SMOKE_GRACE_MIN ?? "1");
-const facilityName = process.env.SMOKE_RESUME || `Smoke ${Date.now()}`;
-
-console.log(`wallet ${account.address}`);
-console.log(`facility ${facilityName}`);
+console.log(`investor ${wallets.investor.address}`);
+console.log(`originator ${wallets.originator.address}`);
+console.log(`risk agent ${wallets.risk.address}`);
 await page.goto(url, { waitUntil: "networkidle2" });
 await shot("landing");
+await click("Explore markets");
+await sleep(2_000);
+if (await page.evaluate(buttonReady("Connect wallet").fn, "Connect wallet")) await click("Connect wallet");
+await actAs("originator");
 
-const alreadyConnected = await page.evaluate((prefix) => document.body.innerText.includes(prefix), account.address.slice(0, 6));
-if (!alreadyConnected) await clickButton("Connect wallet");
-await waitForText(account.address.slice(0, 6));
-await shot("connected");
-
-const resuming = !!process.env.SMOKE_RESUME;
-const from = process.env.SMOKE_FROM ?? (resuming ? "default" : "start");
-
-if (from === "start") {
-  await clickButton("Originate");
-  await waitForText("New facility");
-
-  if (await page.evaluate(() => [...document.querySelectorAll("button")].some((b) => b.innerText.trim() === "Get test USDC (100,000)"))) {
-    await clickButton("Get test USDC (100,000)");
-    await waitForButton("Get test USDC (100,000)");
-  }
-  await shot("funded");
-
-  await setLabeledInput("Name", facilityName);
-  await setLabeledInput("Credit limit", amount(20));
-  await setLabeledInput("First-loss stake", amount(2));
-  await setLabeledInput("Tenor", String(tenorMinutes));
-  await setLabeledInput("Grace period", String(graceMinutes));
-  await setLabeledInput("Capital cap", amount(1000));
-  const needsStakeApproval = await page.evaluate(() =>
-    [...document.querySelectorAll("button")].some((b) => b.innerText.trim() === "Approve first-loss stake" && !b.disabled),
-  );
-  if (needsStakeApproval) {
-    await clickButton("Approve first-loss stake");
-    await waitForButton("Open facility");
-  }
-  await clickButton("Open facility");
-  await waitForCard(facilityName);
-  await shot("facility-opened");
-
-  await scopedClick(facilityName, "View →");
-  await waitForText(facilityName);
-  const facilityHash = await page.evaluate(() => location.hash);
-  await checkAllBoxes();
-
-  await setSelect(0, "Junior");
-  await setInput('input[placeholder^="Amount"]', amount(10));
-  if (await page.evaluate(() => [...document.querySelectorAll("button")].some((b) => b.innerText.trim() === "Approve" && !b.disabled))) {
-    await clickButton("Approve");
-    await waitForButton("Deposit");
-  }
-  await clickButton("Deposit");
-  await waitForText("Capital supplied successfully.");
-  await shot("junior-deposited");
-
-  await page.evaluate((h) => { location.hash = h; }, facilityHash);
-  await waitForText(facilityName);
-  await checkAllBoxes();
-  await setSelect(0, "Senior");
-  await setInput('input[placeholder^="Amount"]', amount(20));
-  await clickButton("Deposit");
-  await waitForText("Capital supplied successfully.");
-  await shot("senior-deposited");
+if (paths.includes("repaid")) {
+  const name = await openFacility("a", { limit: "10", firstLoss: "3", fee: "5", duration: "2", grace: "1" });
+  await supply("a", name, "6");
+  await draw("a", name);
+  await click("Review repayment");
+  await click("Repay now");
+  await waitForText("Facility complete");
+  await shot("a-repaid");
+  await claim("a", name);
 }
 
-if (from === "start" || from === "drawdown") {
-  await clickButton("Originate");
-  await waitForCard(facilityName);
-  await scopedSetInput(facilityName, 'input[placeholder="Drawdown amount"]', amount(15));
-  await scopedClick(facilityName, "Drawdown");
-  await scopedWaitUntilGone(facilityName, "Owed (live): 0 ");
-  await shot("drawn");
+if (paths.includes("default")) {
+  const name = await openFacility("b", { limit: "10", firstLoss: "3", fee: "5", duration: "2", grace: "1" });
+  await supply("b", name, "6");
+  await draw("b", name);
+  await waitForText("Past due", 5 * 60_000);
+  await shot("b-past-due");
 
+  await actAs("risk");
   await page.evaluate(() => { location.hash = "ops"; });
-  await waitForCard(facilityName);
-  await scopedWaitForButton(facilityName, "Mark late", { timeout: (tenorMinutes + 2) * 60_000 });
-  await shot("past-due");
+  await page.reload({ waitUntil: "networkidle2" });
+  await waitForText(current.address.slice(0, 6));
+  await until({ fn: (n) => [...document.querySelectorAll(".card")].some((c) => c.innerText.includes(n)), arg: name }, "risk card");
+  await page.evaluate((n) => {
+    const card = [...document.querySelectorAll(".card")].find((c) => c.innerText.includes(n));
+    const area = card.querySelector("textarea");
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(area, "Buyer missed payment; restructuring refused");
+    area.dispatchEvent(new Event("input", { bubbles: true }));
+  }, name);
+  await until({ fn: (n) => [...[...document.querySelectorAll(".card")].find((c) => c.innerText.includes(n)).querySelectorAll("button")].some((b) => b.innerText.trim() === "Declare default" && !b.disabled), arg: name }, "declare default enabled", 4 * 60_000);
+  await shot("b-ops");
+  await page.evaluate((n) => [...[...document.querySelectorAll(".card")].find((c) => c.innerText.includes(n)).querySelectorAll("button")].find((b) => b.innerText.trim() === "Declare default").click(), name);
+  await until({ fn: (n) => [...document.querySelectorAll(".card")].find((c) => c.innerText.includes(n))?.innerText.includes("Defaulted"), arg: name }, "defaulted");
+  await shot("b-defaulted");
 
-  await scopedClick(facilityName, "Mark late");
-  await scopedWaitForText(facilityName, "Late");
-  await shot("marked-late");
-} else {
-  await page.evaluate(() => { location.hash = "ops"; });
-  await waitForCard(facilityName);
+  await page.evaluate(() => { location.hash = "facilities"; });
+  await page.reload({ waitUntil: "networkidle2" });
+  await actAs("originator", "Originator");
+  await clickCard(".facility-row", name);
+  await waitForText("Remit recoveries");
+  await shot("b-remit");
+  await click("Review");
+  await click("Remit");
+  await waitForText("Balance cleared");
+  await shot("b-recovered");
+  await claim("b", name);
 }
 
-await scopedSetInput(facilityName, 'textarea[placeholder="Default reason"]', "buyer failed to pay; restructuring refused");
-await scopedWaitForButton(facilityName, "Declare default", { timeout: (graceMinutes + 2) * 60_000 });
-await scopedClick(facilityName, "Declare default");
-await scopedWaitForText(facilityName, "Defaulted");
-await shot("defaulted");
-
-const needsRecoveryApproval = await scopedHasEnabledButton(facilityName, "Approve");
-await scopedSetInput(facilityName, 'input[placeholder="Recovery amount"]', amount(Number(process.env.SMOKE_RECOVERY ?? "15")));
-if (needsRecoveryApproval) {
-  await scopedClick(facilityName, "Approve");
-  await scopedWaitForButton(facilityName, "Record recovery");
-}
-await scopedClick(facilityName, "Record recovery");
-await scopedWaitForText(facilityName, "first-loss 0", { timeout: 60_000 }).catch(() => {});
-await sleep(6_000);
-await shot("recovered");
-
-if (process.env.SMOKE_WITHDRAW !== "0") {
-  await clickButton("Originate");
-  await waitForCard(facilityName);
-  await scopedClick(facilityName, "View →");
-  await waitForText(facilityName);
-
-  for (const tranche of ["Senior", "Junior"]) {
-    const shares = await page.evaluate((t) => {
-      const m = document.body.innerText.match(new RegExp(`${t} ([\\d,\\.]+)`));
-      return m ? m[1].replace(/,/g, "") : "0";
-    }, tranche);
-    if (shares === "0") continue;
-    await setSelect(1, tranche);
-    await setInput('input[placeholder^="Shares"]', shares);
-    await clickButton("Withdraw");
-    await waitForButton("Withdraw", { timeout: 90_000 }).catch(() => {});
-    await sleep(3_000);
-  }
-  await shot("withdrawn");
-}
-
-console.log("---- final page text ----");
-console.log(await pageText());
+await actAs("originator", "Originator");
+await go("Activity");
+await shot("ledger-originator");
+await actAs("investor", "Capital provider");
+await go("Activity");
+await waitForText("Principal and return claimed", 90_000).catch(() => console.log("claim not indexed yet"));
+await shot("ledger-investor");
 process.exit(0);

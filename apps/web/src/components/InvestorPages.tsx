@@ -3,14 +3,17 @@ import { TokenAmount } from "./TokenAmount";
 import { useMemo, useState, type CSSProperties } from "react";
 import type { Market } from "./Markets";
 import { AmountInput } from "./AmountInput";
-import { DEFAULT_STAGES, STAGE_LABEL, eventTime, maturityOf, positionValue, realizedReturn, waterfallOf, type DemoEvent, type Facility } from "../state/demo";
+import type { Address } from "viem";
+import { useTx } from "../hooks/useTx";
+import { useFacilityReview } from "../hooks/useFacilityReview";
+import { describeMetadataError, documentRows, reviewLabel, type UnderwritingRecord } from "../lib/metadata";
+import { DEFAULT_STAGES, STAGE_LABEL, eventTime, maturityOf, realizedReturn, useBook, useMoney, waterfallOf, type BookEvent, type Facility } from "../state/book";
 
 const toNumber = (value: string) => Number(value.replace(/[^0-9.-]/g, "")) || 0;
-const toAmount = (value: string) => Number(value.replace(/[^0-9-]/g, "")) || 0;
-const usdc = (value: number) => `${value.toLocaleString("en-US", { maximumFractionDigits: 2 })} USD`;
 const onDate = (at: number) => new Date(at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
 function PortfolioChart({ series }: { series: ReturnType<typeof repaymentProjection> }) {
+  const usdc = useMoney();
   const [selected, setSelected] = useState<number | null>(null);
   const first = series[0], last = series[series.length - 1];
   const at = Math.max(first.at, Math.min(selected ?? first.at, last.at));
@@ -87,10 +90,10 @@ export function facilityReview(market: Market) {
     concentration: 22 + seed % 27,
     coverage: (1.12 + (seed % 24) / 100).toFixed(2),
     documents: [
-      ["Credit memorandum", `CM-${String(seed).slice(-4).padStart(4, "0")}`, "Approved"],
-      [typeDocument, `${8 + seed % 23} assets`, "Verified"],
-      ["Originator servicing agreement", market.company, "Executed"],
-      ["KYC and beneficial ownership", market.company, "Verified"],
+      ["Credit memorandum", `CM-${String(seed).slice(-4).padStart(4, "0")}`, "Sample"],
+      [typeDocument, `${8 + seed % 23} assets`, "Sample"],
+      ["Originator servicing agreement", market.company, "Sample"],
+      ["KYC and beneficial ownership", market.company, "Sample"],
     ],
   };
 }
@@ -109,20 +112,24 @@ function StepRail({ step, complete = false }: { step: number; complete?: boolean
 /** Form, then approve, then supply, then the position exists. */
 type Phase = "form" | "approve" | "supply" | "done";
 
-export function Opportunity({ market, onBack, onSupply, onDone }: { market: Market; onBack: () => void; onSupply: (amount: number) => boolean; onDone: () => void }) {
-  const [amount, setAmount] = useState("120000");
+export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { market: Market; onBack: () => void; onApprove: (amount: number) => Promise<void>; onSupply: (amount: number) => Promise<void>; onDone: () => void }) {
+  const { balance, me } = useBook();
+  const tx = useTx();
+  const availableValue = toNumber(market.available);
+  const [amount, setAmount] = useState(() => String(Math.min(availableValue, balance) || availableValue));
   const [phase, setPhase] = useState<Phase>("form");
   const [acceptedRisk, setAcceptedRisk] = useState(false);
   const [acceptedLiquidity, setAcceptedLiquidity] = useState(false);
-  const [supplyError, setSupplyError] = useState("");
   const [reviewPanel, setReviewPanel] = useState<"risk" | "documents" | null>(null);
   const value = Number(amount || 0);
   const targetReturnPct = toNumber(market.targetReturn);
-  const repayment = Math.round(value * (1 + targetReturnPct / 100));
-  const availableValue = toAmount(market.available);
-  const validAmount = Number.isFinite(value) && value > 0 && value <= Math.min(250000, availableValue) && market.accepting;
+  const repayment = value * (1 + targetReturnPct / 100);
+  const validAmount = Number.isFinite(value) && value > 0 && value <= Math.min(balance, availableValue) && market.accepting && !!me;
   const reservePct = toNumber(market.reserve);
   const review = facilityReview(market);
+  const remote = useFacilityReview(market.id);
+  const record = remote.metadata.data?.kind === "record" ? remote.metadata.data.record : null;
+  const label = remote.metadata.data ? reviewLabel(remote.metadata.data) : null;
 
   return <section className="opportunity-page">
     <button className="back-link" onClick={onBack}><span aria-hidden="true">←</span> Back to Markets</button>
@@ -133,9 +140,11 @@ export function Opportunity({ market, onBack, onSupply, onDone }: { market: Mark
           <h2>Supply</h2>
           <p className="panel-copy">Provide capital to earn a {market.targetReturn} target return.</p>
           <label>Asset<select><option>{market.asset}</option></select></label>
-          <p className="balance-row"><span>Wallet balance</span><strong><TokenAmount value={250000} asset={market.asset} /></strong></p>
-          <label>Amount<AmountInput value={amount} onChange={setAmount} suffix={market.asset} action={<button onClick={() => setAmount(String(Math.min(250000, availableValue)))}>Max</button>} /></label>
+          <p className="balance-row"><span>Wallet balance</span><strong>{me ? <TokenAmount value={balance} asset={market.asset} /> : "Connect a wallet"}</strong></p>
+          <label>Amount<AmountInput value={amount} onChange={setAmount} suffix={market.asset} action={<button onClick={() => setAmount(String(Math.min(balance, availableValue)))}>Max</button>} /></label>
           <dl className="supply-totals"><div><dt>Estimated repayment</dt><dd><TokenAmount value={repayment} asset={market.asset} /></dd></div><div><dt>Estimated return</dt><dd><TokenAmount value={Math.max(0, repayment - value)} asset={market.asset} /></dd></div></dl>
+          {value > 0 && value > availableValue && <p className="facility-warn">Only <TokenAmount value={availableValue} asset={market.asset} /> is open to supply.</p>}
+          {value > balance && value <= availableValue && <p className="facility-warn">More than your wallet balance.</p>}
           <button className="accent-button wide" disabled={!validAmount} onClick={() => setPhase("approve")}>Review supply</button>
           <div className="eligibility"><strong>Available to your account</strong><span>Fits your institutional mandate.</span></div>
           <small>Returns depend on repayment. Withdrawals may not be immediately available.</small>
@@ -158,15 +167,18 @@ export function Opportunity({ market, onBack, onSupply, onDone }: { market: Mark
           <label className="review-check"><input type="checkbox" checked={acceptedRisk} onChange={(event) => setAcceptedRisk(event.target.checked)} />Returns depend on buyer repayment.</label>
           <label className="review-check"><input type="checkbox" checked={acceptedLiquidity} onChange={(event) => setAcceptedLiquidity(event.target.checked)} />Withdrawals may be delayed until repayment.</label>
           <div className="review-actions">
-            <button className="secondary-button" onClick={() => setPhase("form")}>Back</button>
+            <button className="secondary-button" disabled={tx.busy} onClick={() => setPhase("form")}>Back</button>
             <button
               className="primary-button"
-              disabled={!acceptedRisk || !acceptedLiquidity || !validAmount}
-              onClick={() => { if (phase === "approve") return setPhase("supply"); if (onSupply(value)) setPhase("done"); else setSupplyError("Supply was not completed. Check the available capacity and try again."); }}
-            >{phase === "approve" ? `Approve ${market.asset}` : "Supply capital"}</button>
+              disabled={!acceptedRisk || !acceptedLiquidity || !validAmount || tx.busy}
+              onClick={async () => {
+                if (phase === "approve") { if (await tx.run(() => onApprove(value))) setPhase("supply"); return; }
+                if (await tx.run(() => onSupply(value))) setPhase("done");
+              }}
+            >{tx.busy ? "Confirm in wallet…" : phase === "approve" ? `Approve ${market.asset}` : "Supply capital"}</button>
           </div>
           <small>You will confirm each transaction in your wallet. Anora never takes custody of your wallet.</small>
-          {supplyError && <p role="alert">{supplyError}</p>}
+          {tx.error && <p className="facility-warn" role="alert">{tx.error}</p>}
         </>}
 
         {phase === "done" && <div className="flow-done" role="status">
@@ -184,52 +196,87 @@ export function Opportunity({ market, onBack, onSupply, onDone }: { market: Mark
           <small>Your position now tracks this facility until the originator repays.</small>
         </div>}
       </aside>
-      <section className="market-detail-panel"><dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available to invest</dt><dd><TokenAmount value={availableValue} asset={market.asset} /></dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl><div className="detail-section"><header><strong>Funding</strong><span>{market.fundingLabel}</span></header>{market.accepting && <progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress>}</div><div className="detail-section"><header><strong>Protection before your position</strong><span>{market.reserve} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{market.reserve}</span><span>{Math.max(0, 100 - reservePct)}%</span></div><div className="detail-section-footer"><p>The reserve absorbs losses before your position.</p><button className="text-link" onClick={() => setReviewPanel("risk")}>View risk and underwriting</button></div></div><div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>{market.asset}</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>Verified 2 hours ago</dd></div></dl></div><div className="inline-links"><button onClick={() => setReviewPanel("documents")}>Facility documents</button><button>Transaction history</button></div></section>
+      <section className="market-detail-panel"><dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available to invest</dt><dd><TokenAmount value={availableValue} asset={market.asset} /></dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl><div className="detail-section"><header><strong>Funding</strong><span>{market.fundingLabel}</span></header>{market.accepting && <progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress>}</div><div className="detail-section"><header><strong>Protection before your position</strong><span>{market.reserve} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{market.reserve}</span><span>{Math.max(0, 100 - reservePct)}%</span></div><div className="detail-section-footer"><p>The reserve absorbs losses before your position.</p><button className="text-link" onClick={() => setReviewPanel("risk")}>View risk and underwriting</button></div></div><div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>{market.asset}</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>{label ? label.text : remote.api && remote.metadata.isError ? "METADATA_UNAVAILABLE" : "Sample, not verified"}</dd></div></dl></div><div className="inline-links"><button onClick={() => setReviewPanel("documents")}>Facility documents</button><button>Transaction history</button></div></section>
     </div>
     {reviewPanel && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setReviewPanel(null); }}><div className="modal facility-review-modal" role="dialog" aria-modal="true" aria-labelledby="facility-review-title">
       <button className="modal-close" aria-label="Close" onClick={() => setReviewPanel(null)}>×</button>
-      <span className="review-kicker">{reviewPanel === "risk" ? "Curator-approved" : "Facility data room"}</span>
-      <h2 id="facility-review-title">{reviewPanel === "risk" ? "Risk and underwriting" : "Facility documents"}</h2>
-      <p>{market.name} · {market.route}</p>
-      {reviewPanel === "risk" ? <>
-        <div className="underwriting-grade"><strong>{review.grade}</strong><div><span>Underwriting grade</span><small>Reviewed {review.reviewed}</small></div></div>
-        <dl className="underwriting-metrics">
-          <div><dt>Operating history</dt><dd>{review.history}</dd></div>
-          <div><dt>Verified trade assets</dt><dd>{review.verifiedAssets}</dd></div>
-          <div><dt>Largest buyer exposure</dt><dd>{review.concentration}%</dd></div>
-          <div><dt>Document coverage</dt><dd>{review.coverage}×</dd></div>
-        </dl>
-        <div className="review-waterfall"><span style={{ width: `${market.seniorPct}%` }}>Senior {market.seniorPct.toFixed(1)}%</span><span style={{ width: `${market.juniorPct}%` }}>Junior {market.juniorPct.toFixed(1)}%</span><span style={{ width: `${reservePct}%` }}>Reserve {market.reserve}</span></div>
-        <p className="review-note">Approved within the facility’s concentration, documentation, servicing, and first-loss limits.</p>
-      </> : <div className="document-list">{review.documents.map(([title, detail, status]) => <article key={title}><div><strong>{title}</strong><small>{detail}</small></div><span>✓ {status}</span></article>)}</div>}
+      {reviewPanel === "risk" ? <RiskPanel market={market} review={review} record={record} label={label?.text ?? null} sample={label ? label.sample : true} api={remote.api} error={remote.api && remote.metadata.isError ? describeMetadataError(remote.metadata.error) : null} reservePct={reservePct} /> : <DocumentsPanel market={market} review={review} remote={remote} />}
     </div></div>}
   </section>;
 }
 
-export function Portfolio({ notice, latestSupplyId, onView, onActivity, live, onClaim }: { notice: string | null; latestSupplyId: string | null; onView: (id: string) => void; onActivity: () => void; live: Facility[]; onClaim: (id: string) => void }) {
+type Review = ReturnType<typeof facilityReview>;
+type Remote = ReturnType<typeof useFacilityReview>;
+
+function RiskPanel({ market, review, record, label, sample, api, error, reservePct }: { market: Market; review: Review; record: UnderwritingRecord | null; label: string | null; sample: boolean; api: string | undefined; error: string | null; reservePct: number }) {
+  const kicker = error ?? (api ? label : "Sample data · no underwriting service connected");
+  const grade = record ? record.underwriting.grade : review.grade;
+  const reviewed = record ? `Reviewed ${new Date(record.underwriting.reviewedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : `Reviewed ${review.reviewed}`;
+  const history = record ? (record.metadata.operatingHistoryYears === undefined ? "Not provided" : `${record.metadata.operatingHistoryYears} years reviewed`) : review.history;
+  const assets = record ? (record.metadata.verifiedAssets ?? "Not provided") : review.verifiedAssets;
+  const concentration = record ? (record.metadata.buyerConcentrationPct === undefined ? "Not provided" : `${record.metadata.buyerConcentrationPct}%`) : `${review.concentration}%`;
+  const coverage = record ? (record.metadata.documentCoverage === undefined ? "Not provided" : `${record.metadata.documentCoverage}×`) : `${review.coverage}×`;
+  return <>
+    <span className="review-kicker">{kicker}</span>
+    <h2 id="facility-review-title">Risk and underwriting</h2>
+    <p>{market.name} · {market.route}</p>
+    {error ? <p className="review-note">The underwriting record could not be loaded. No sample figures are shown in its place.</p> : <>
+      <div className="underwriting-grade"><strong>{grade}</strong><div><span>Underwriting grade</span><small>{reviewed}</small></div></div>
+      <dl className="underwriting-metrics">
+        <div><dt>Operating history</dt><dd>{history}</dd></div>
+        <div><dt>Verified trade assets</dt><dd>{assets}</dd></div>
+        <div><dt>Largest buyer exposure</dt><dd>{concentration}</dd></div>
+        <div><dt>Document coverage</dt><dd>{coverage}</dd></div>
+      </dl>
+      <div className="review-waterfall"><span style={{ width: `${market.seniorPct}%` }}>Senior {market.seniorPct.toFixed(1)}%</span><span style={{ width: `${market.juniorPct}%` }}>Junior {market.juniorPct.toFixed(1)}%</span><span style={{ width: `${reservePct}%` }}>Reserve {market.reserve}</span></div>
+      <p className="review-note">{sample ? "Illustrative figures generated from the facility name. Only the reserve split above comes from the contract." : record?.underwriting.note || "Reviewed figures. The reserve split above comes from the contract."}</p>
+    </>}
+  </>;
+}
+
+function DocumentsPanel({ market, review, remote }: { market: Market; review: Review; remote: Remote }) {
+  const { api, documents, login, signedIn, canSignIn } = remote;
+  const items = documents.data?.items ?? [];
+  const failed = !!api && documents.isError;
+  const rows = api && items.length > 0 ? documentRows(items, api) : null;
+  const kicker = failed ? describeMetadataError(documents.error) : rows ? `Document service · manifest v${documents.data!.manifestVersion}` : api ? "Sample data · no documents uploaded" : "Sample data · no document service connected";
+  return <>
+    <span className="review-kicker">{kicker}</span>
+    <h2 id="facility-review-title">Facility documents</h2>
+    <p>{market.name} · {market.route}</p>
+    {failed ? <p className="review-note">The document list could not be loaded. No sample documents are shown in its place.</p> : rows ? <div className="document-list">
+      {rows.map((row) => <article key={row.title + row.detail}><div><strong>{row.title}</strong><small>{row.detail}</small></div>{row.href ? <a className="text-link" href={row.href} target="_blank" rel="noreferrer">{row.badge}</a> : <span>{row.badge}</span>}</article>)}
+      {rows.some((row) => row.signIn) && !signedIn && <div className="review-note">{canSignIn ? <button className="text-link" onClick={() => login.mutate()} disabled={login.isPending}>{login.isPending ? "Confirm in wallet…" : "Sign in to view"}</button> : "Connect a wallet and sign in to view restricted documents."}{login.isError && <small> {(login.error as Error).message}</small>}</div>}
+    </div> : <div className="document-list">{review.documents.map(([title, detail, status]) => <article key={title}><div><strong>{title}</strong><small>{detail}</small></div><span>{status}</span></article>)}</div>}
+  </>;
+}
+
+export function Portfolio({ notice, latestSupplyId, onView, onActivity, live, onClaim }: { notice: string | null; latestSupplyId: Address | null; onView: (id: Address) => void; onActivity: () => void; live: Facility[]; onClaim: (id: Address) => Promise<void> }) {
+  const usdc = useMoney();
+  const tx = useTx();
   const [claiming, setClaiming] = useState(false);
   const [range, setRange] = useState("90D");
 
   // Every figure on this page is a view of the same facility records, so the
   // summary, chart, table, and insights cannot drift apart.
   const positions = useMemo(
-    () => live.filter((facility) => facility.stage !== "settled" && facility.stage !== "closed")
-      .map((facility) => ({ facility, value: positionValue(facility) }))
+    () => live.filter((facility) => facility.holding.value > 0)
+      .map((facility) => ({ facility, value: facility.holding.value }))
       .sort((a, b) => b.value - a.value),
     [live],
   );
-  const supplied = positions.reduce((sum, position) => sum + position.facility.supplied, 0);
+  const supplied = positions.reduce((sum, position) => sum + position.facility.holding.supplied, 0);
   const value = positions.reduce((sum, position) => sum + position.value, 0);
   const claimable = positions.filter((position) => position.facility.stage === "repaid" || position.facility.stage === "recovered");
   const claimTotal = claimable.reduce((sum, position) => sum + position.value, 0);
-  const claimPrincipal = claimable.reduce((sum, position) => sum + position.facility.supplied, 0);
+  const claimPrincipal = claimable.reduce((sum, position) => sum + position.facility.holding.supplied, 0);
   const earned = live.reduce((sum, facility) => sum + realizedReturn(facility), 0);
   const series = useMemo(() => repaymentProjection(live, range === "1Y" ? 365 : parseInt(range)), [live, range]);
 
   const share = (amount: number) => (value > 0 ? (amount / value) * 100 : 0);
   const defaults = live.filter((facility) => facility.stage === "recovered" || facility.stage === "closed");
   const due = positions
-    .filter((position) => position.facility.stage === "funded" || position.facility.stage === "drawn")
+    .filter((position) => position.facility.stage === "funded" || position.facility.stage === "drawn" || position.facility.stage === "late")
     .sort((a, b) => maturityOf(a.facility) - maturityOf(b.facility));
   const exposure = [...positions.reduce((map, position) => {
     const origin = position.facility.route.split("\u2192")[0].trim();
@@ -271,13 +318,13 @@ export function Portfolio({ notice, latestSupplyId, onView, onActivity, live, on
           ? <p className="empty-state">No open positions yet. Supply capital from Markets to start one.</p>
           : positions.map(({ facility, value: amount }) => <div className="table-row" key={facility.id}>
             <span>{facility.id === latestSupplyId && <i className="recent-supply-dot" role="img" aria-label="Most recently supplied" title="Most recently supplied" />}{facility.name}</span>
-            <span><TokenAmount value={facility.supplied} asset={facility.asset} /></span>
-            <span className={amount < facility.supplied ? "negative" : ""}><TokenAmount value={amount} asset={facility.asset} /></span>
+            <span><TokenAmount value={facility.holding.supplied} asset={facility.asset} /></span>
+            <span className={amount < facility.holding.supplied ? "negative" : ""}><TokenAmount value={amount} asset={facility.asset} /></span>
             <span>{facility.targetReturn}%</span>
             <span>{DEFAULT_STAGES.includes(facility.stage) ? "In default" : onDate(maturityOf(facility))}</span>
             <span className={`market-status ${facility.stage}`}>{STAGE_LABEL[facility.stage]}</span>
             {facility.stage === "repaid" || facility.stage === "recovered"
-              ? <button onClick={() => onClaim(facility.id)}>Claim</button>
+              ? <button disabled={tx.busy} onClick={() => tx.run(() => onClaim(facility.id))}>Claim</button>
               : <button onClick={() => onView(facility.id)}>View</button>}
           </div>)}
       </div>
@@ -316,7 +363,11 @@ export function Portfolio({ notice, latestSupplyId, onView, onActivity, live, on
         <div><dt>Original principal</dt><dd>{usdc(claimPrincipal)}</dd></div>
         <div><dt>Net return</dt><dd className={claimTotal >= claimPrincipal ? "positive" : "negative"}>{usdc(claimTotal - claimPrincipal)}</dd></div>
       </dl>
-      <button className="primary-button wide" onClick={() => { claimable.forEach((position) => onClaim(position.facility.id)); setClaiming(false); }}>Confirm claim</button>
+      {tx.error && <p className="facility-warn">{tx.error}</p>}
+      <button className="primary-button wide" disabled={tx.busy} onClick={async () => {
+        const done = await tx.run(async () => { for (const position of claimable) await onClaim(position.facility.id); });
+        if (done) setClaiming(false);
+      }}>{tx.busy ? "Confirm in wallet…" : "Confirm claim"}</button>
       <button className="secondary-button wide" onClick={() => setClaiming(false)}>Cancel</button>
     </div></div>}
   </section>;
@@ -325,12 +376,12 @@ export function Portfolio({ notice, latestSupplyId, onView, onActivity, live, on
 const INVESTOR_FILTERS = ["All", "Supplies", "Repayments", "Credit"];
 
 /** Which filter tab an entry belongs to. */
-function bucketFor(event: DemoEvent) {
+function bucketFor(event: BookEvent) {
   if (event.actor === "Keeper") return "Credit";
   return event.event.startsWith("Capital supplied") ? "Supplies" : "Repayments";
 }
 
-export function Activity({ events = [] }: { events?: DemoEvent[] }) {
+export function Activity({ events = [] }: { events?: BookEvent[] }) {
   const [filter, setFilter] = useState("All");
   const visible = events.filter((event) => filter === "All" || bucketFor(event) === filter);
 

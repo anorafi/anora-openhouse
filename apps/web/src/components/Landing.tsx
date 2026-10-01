@@ -1,5 +1,5 @@
 import { MarketCard, type Market } from "./Markets";
-import { facilityAsMarket, useDemo } from "../state/demo";
+import { facilityAsMarket, useBook } from "../state/book";
 
 const FEATURES = [
   {
@@ -27,14 +27,14 @@ const STEPS = [
 ];
 
 export function Landing({ onExplore, onMarket, onOriginator }: { onExplore: () => void; onMarket: (market: Market) => void; onOriginator: () => void }) {
-  const { facilities } = useDemo();
+  const { facilities, symbol } = useBook();
   const origins = new Set<string>();
   const featured = facilities.filter((facility) => {
     const origin = facility.route.split("→")[0].trim();
     if (origins.has(origin)) return false;
     origins.add(origin);
     return true;
-  }).slice(0, 3).map(facilityAsMarket);
+  }).slice(0, 3).map((facility) => facilityAsMarket(facility, symbol));
   return <>
     <section className="landing-page">
     <div className="landing-card">

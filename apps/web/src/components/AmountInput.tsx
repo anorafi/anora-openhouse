@@ -1,8 +1,17 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 
+const decimalDigits = (text: string) => text.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+
+function grouped(value: string) {
+  if (!value) return "";
+  const [whole, fraction] = value.split(".");
+  const head = Number(whole || "0").toLocaleString("en-US");
+  return fraction === undefined ? head : `${head}.${fraction}`;
+}
+
 /**
- * A USDC field that groups thousands as you type. The value stays a plain
- * digit string, so callers keep reading it with Number(); only the rendering
+ * An amount field that groups thousands as you type. The value stays a plain
+ * decimal string, so callers keep reading it with Number(); only the rendering
  * carries separators.
  */
 export function AmountInput({ value, onChange, suffix, action }: {
@@ -33,11 +42,11 @@ export function AmountInput({ value, onChange, suffix, action }: {
     <input
       ref={ref}
       inputMode="decimal"
-      value={value ? Number(value).toLocaleString("en-US") : ""}
+      value={grouped(value)}
       onChange={(event) => {
         const caret = event.target.selectionStart ?? event.target.value.length;
         digitsBefore.current = event.target.value.slice(0, caret).replace(/\D/g, "").length;
-        onChange(event.target.value.replace(/\D/g, ""));
+        onChange(decimalDigits(event.target.value));
       }}
     />
     <span>{suffix}</span>

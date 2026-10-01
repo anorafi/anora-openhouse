@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import type { Address } from "viem";
 import { useChainId, useReadContracts } from "wagmi";
 import { facilityContract, ZERO_ADDRESS } from "../config/contracts";
+import { CHAIN_POLL_MS } from "../config/polling";
 
-const REFETCH_MS = 5_000;
 
 export interface Position {
   seniorShares: bigint;
@@ -28,7 +28,7 @@ export function useMyPositions(addresses: readonly Address[] | undefined, owner:
 
   const { data, isLoading } = useReadContracts({
     contracts,
-    query: { enabled: list.length > 0 && !!owner, refetchInterval: REFETCH_MS },
+    query: { enabled: list.length > 0 && !!owner, refetchInterval: CHAIN_POLL_MS },
   });
 
   const positions = new Map<Address, Position>();

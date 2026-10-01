@@ -1,10 +1,16 @@
+import { useMemo } from "react";
 import type { Address } from "viem";
 import { useChainId } from "wagmi";
-import { deploymentFor, type Deployment } from "../config/deployments";
+import { useManifest } from "../config/ManifestContext";
+import { deploymentOf, networkFor, type Deployment } from "../config/manifest";
 
 export function useDeployment(): Deployment | undefined {
   const chainId = useChainId();
-  return deploymentFor(chainId);
+  const manifest = useManifest();
+  return useMemo(() => {
+    const network = networkFor(manifest, chainId);
+    return network ? deploymentOf(network) : undefined;
+  }, [manifest, chainId]);
 }
 
 export function useFactoryAddress(): Address | undefined {

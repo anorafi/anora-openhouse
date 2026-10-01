@@ -1,17 +1,20 @@
 import { expect, it } from "vitest";
 import { repaymentProjection } from "./repaymentProjection";
-import type { Facility } from "../state/demo";
+import type { Facility } from "./book";
+
+const DAY = 86400000;
+const held = (value: number) => ({ seniorShares: 0n, juniorShares: 0n, value, supplied: 100 });
 
 it("reconciles portfolio value and adds only scheduled returns without duplicating principal", () => {
   const now = 1000000000;
-  const base = { name: "Trade", drawn: 100, supplied: 100, targetReturn: 10, openedAt: now, durationDays: 60, repaid: 0, recovered: 0, firstLoss: 20 } as Facility;
+  const base = { name: "Trade", targetReturn: 10, dueAt: now + 60 * DAY, holding: held(100) } as Facility;
   const facilities: Facility[] = [
     { ...base, stage: "drawn" },
     { ...base, stage: "funded" },
-    { ...base, stage: "defaulted" },
-    { ...base, stage: "settled", repaid: 110 },
-    { ...base, stage: "repaid", repaid: 110 },
-    { ...base, stage: "drawn", openedAt: now - 100 * 86400000 },
+    { ...base, stage: "defaulted", holding: held(20) },
+    { ...base, stage: "settled", holding: held(0) },
+    { ...base, stage: "repaid", holding: held(110) },
+    { ...base, stage: "drawn", dueAt: now - 40 * DAY },
   ];
   expect(repaymentProjection(facilities, 30, now).slice(-1)[0]?.value).toBe(430);
   const forecast = repaymentProjection(facilities, 90, now);
@@ -22,14 +25,22 @@ it("reconciles portfolio value and adds only scheduled returns without duplicati
   expect(repaymentProjection([], 90, now).slice(-1)[0]?.value).toBe(0);
 });
 
+it("does not schedule returns on a past-due facility", () => {
+  const now = 1000000000;
+  const late = { name: "Late", stage: "late", targetReturn: 10, dueAt: now + 5 * DAY, holding: held(100) } as Facility;
+  const forecast = repaymentProjection([late], 30, now);
+  expect(forecast[0].value).toBe(100);
+  expect(forecast.slice(-1)[0]?.value).toBe(100);
+});
+
 it("updates today's balance and projected returns after a new supply or top-up", () => {
   const now = 1000000000;
-  const position = { name: "New trade", stage: "funded", supplied: 120000, drawn: 0, repaid: 0, targetReturn: 8.5, openedAt: now, durationDays: 60 } as Facility;
+  const position = { name: "New trade", stage: "funded", targetReturn: 8.5, dueAt: now + 60 * DAY, holding: held(120000) } as Facility;
   const initial = repaymentProjection([position], 90, now);
   expect(initial[0].value).toBe(120000);
   expect(initial.slice(-1)[0]?.value).toBe(130200);
-  const toppedUp = repaymentProjection([{ ...position, supplied: 150000 }], 90, now);
+  const toppedUp = repaymentProjection([{ ...position, holding: held(150000) }], 90, now);
   expect(toppedUp[0].value).toBe(150000);
   expect(toppedUp.slice(-1)[0]?.value).toBe(162750);
-  expect(repaymentProjection([{ ...position, stage: "settled" }], 90, now).slice(-1)[0]?.value).toBe(0);
+  expect(repaymentProjection([{ ...position, stage: "settled", holding: held(0) }], 90, now).slice(-1)[0]?.value).toBe(0);
 });

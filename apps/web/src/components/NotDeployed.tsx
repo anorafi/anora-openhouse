@@ -1,27 +1,21 @@
 import { useSwitchChain } from "wagmi";
-import { arbitrumSepolia } from "wagmi/chains";
-import { robinhood } from "../config/wagmi";
-import { useDeployment } from "../hooks/useDeployment";
+import { orderedNetworks } from "../config/chains";
+import { useManifest } from "../config/ManifestContext";
 
 export function NotDeployed() {
-  const deployment = useDeployment();
+  const manifest = useManifest();
   const { switchChain, isPending } = useSwitchChain();
-
-  const message = deployment
-    ? "Anora is not deployed on this network yet."
-    : "This network is not supported by Anora.";
 
   return (
     <section className="panel">
-      <h2>{message}</h2>
+      <h2>This network is not supported by Anora.</h2>
       <p className="muted">Switch to a supported network to continue.</p>
       <div className="row">
-        <button className="btn" disabled={isPending} onClick={() => switchChain({ chainId: robinhood.id })}>
-          Robinhood Chain
-        </button>
-        <button className="btn" disabled={isPending} onClick={() => switchChain({ chainId: arbitrumSepolia.id })}>
-          Arbitrum Sepolia
-        </button>
+        {orderedNetworks(manifest).map((network) => (
+          <button key={network.chainId} className="btn" disabled={isPending} onClick={() => switchChain({ chainId: network.chainId })}>
+            {network.name}
+          </button>
+        ))}
       </div>
     </section>
   );

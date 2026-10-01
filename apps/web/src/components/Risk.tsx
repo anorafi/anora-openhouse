@@ -11,6 +11,7 @@ import { useAllFacilityAddresses, useIsRiskAgent } from "../hooks/useFactory";
 import { useFacilities, type FacilityData } from "../hooks/useFacilities";
 import { useNow } from "../hooks/useNow";
 import { describeContractError } from "../lib/errors";
+import { decodeFacilityName } from "../lib/facilityName";
 import { secondsUntil } from "../lib/facility";
 import { formatDuration, formatUsdc, parseUsdc } from "../lib/format";
 
@@ -73,7 +74,7 @@ function RiskCard({ facility, isRiskAgent }: { facility: FacilityData; isRiskAge
     <div className="card">
       <div className="card-head">
         <StatusBadge status={facility.statusName} />
-        <span className="card-title">{facility.name}</span>
+        <span className="card-title">{decodeFacilityName(facility.name).name}</span>
         <AddressLink address={facility.originator} />
       </div>
 
@@ -107,15 +108,17 @@ function RiskCard({ facility, isRiskAgent }: { facility: FacilityData; isRiskAge
         </div>
       )}
 
-      <div className="row">
-        <button
-          className="btn"
-          disabled={!canMarkLate || markLate.isPending || markLate.isConfirming}
-          onClick={() => markLate.writeContractAsync({ ...facilityCall, functionName: "markLate", args: [] })}
-        >
-          {markLate.isPending || markLate.isConfirming ? "Marking..." : "Mark late"}
-        </button>
-      </div>
+      {facility.statusName === "Open" && facility.principal > 0n && (
+        <div className="row">
+          <button
+            className="btn"
+            disabled={!canMarkLate || markLate.isPending || markLate.isConfirming}
+            onClick={() => markLate.writeContractAsync({ ...facilityCall, functionName: "markLate", args: [] })}
+          >
+            {markLate.isPending || markLate.isConfirming ? "Marking..." : "Mark late"}
+          </button>
+        </div>
+      )}
       {markLate.error && <p className="error">{describeContractError(markLate.error)}</p>}
       <TxLink hash={markLate.hash} />
 

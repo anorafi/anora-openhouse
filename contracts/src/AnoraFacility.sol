@@ -49,6 +49,7 @@ contract AnoraFacility is Initializable, ReentrancyGuard, IRiskAgentSource {
     error FacilityNotOpen();
     error FacilityNotLate();
     error NotPastDue();
+    error PastDue();
     error GraceNotElapsed();
     error Overpayment();
     error NothingToRecover();
@@ -180,6 +181,7 @@ contract AnoraFacility is Initializable, ReentrancyGuard, IRiskAgentSource {
     function drawdown(uint256 amount) external nonReentrant {
         if (msg.sender != originator) revert NotOriginator();
         if (status != Status.Open) revert FacilityNotOpen();
+        if (dueAt != 0 && block.timestamp > dueAt) revert PastDue();
         if (principal + amount > terms.limit) revert LimitExceeded();
         if (amount > liquidity()) revert InsufficientLiquidity();
         uint256 drawFee = amount * terms.financingFeeBps / BPS;
@@ -288,7 +290,7 @@ contract AnoraFacility is Initializable, ReentrancyGuard, IRiskAgentSource {
 
     function _distributeFee(uint256 amount) internal {
         if (amount == 0) return;
-        uint256 toSenior = amount * terms.seniorFeeShareBps / BPS;
+        uint256 toSenior = juniorTotalShares == 0 ? amount : amount * terms.seniorFeeShareBps / BPS;
         seniorAssets += toSenior;
         juniorAssets += amount - toSenior;
     }
