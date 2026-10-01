@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "gitCommit": "375c02f",
+  "gitCommit": "e404d57",
   "abi": {
     "AnoraFactory": [
       {
@@ -1587,12 +1587,12 @@
   },
   "codeHashes": {
     "4663": {
-      "factory": "0x56b31d9e5a8baae6fed748f8bdc440a2610bc574d66bb9ffec9a545dcb1b5df9",
-      "facilityImplementation": "0xa9f293abcb5c03218c5b60e868fce0072bb196db4a9f513b84c8c22f00a7e14c"
+      "factory": "0xefede6c0fd35f9050e8979c6d40405702ff0bf48d0046513157f0629da241e6c",
+      "facilityImplementation": "0x42541846d96c0b45f2effe6b9cb6651bb7ca6212d54436ef59183b45e3e19be3"
     },
     "421614": {
-      "factory": "0x20790fbae1b3d79252cc53c8a52fc0208a7b710c2658d407f30ac409510b6b1d",
-      "facilityImplementation": "0xa9f293abcb5c03218c5b60e868fce0072bb196db4a9f513b84c8c22f00a7e14c"
+      "factory": "0x58f8f44a43546fbbf315a4ef778604678d74378f535e1caf5a39ded66d0294ca",
+      "facilityImplementation": "0x42541846d96c0b45f2effe6b9cb6651bb7ca6212d54436ef59183b45e3e19be3"
     }
   }
 }

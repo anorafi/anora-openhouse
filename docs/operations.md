@@ -16,8 +16,8 @@ Facilities read the risk agent from their factory on every call, so `setRiskAgen
 
 | Chain | Factory |
 |---|---|
-| Arbitrum Sepolia (421614) | `0x9F356D8eEf33a04F2F0628B80441D3Ed8Ebd4B52` |
-| Robinhood Chain (4663) | `0x6CcDaf026fB01d0138570a87D9D226Dd9f6B6155` |
+| Arbitrum Sepolia (421614) | `0x6D051e17Be86CC7e3f24AbAf1393028c5B800c83` |
+| Robinhood Chain (4663) | `0x2Db15442C0242c5A0498E6Ff58a37e86E2d63692` |
 
 Current addresses are always in `contracts/deployments.json` and in the published `manifest.json`.
 
