@@ -44,7 +44,7 @@ const META: Record<string, ChainMeta> = {
   },
 };
 
-const DEFAULT_CHAIN_ID = 421614;
+const DEFAULT_CHAIN_ID = Number(process.env.DEFAULT_CHAIN_ID ?? 4663);
 
 const factoryAbi = parseAbi([
   "function asset() view returns (address)",
