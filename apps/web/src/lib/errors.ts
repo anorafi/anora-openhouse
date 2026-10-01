@@ -6,6 +6,7 @@ const REVERT_MESSAGES: Record<string, string> = {
   FirstLossTooSmall: "First-loss stake is below the policy minimum for this credit limit.",
   InvalidTerms: "These facility terms are not valid. Check the limit, first-loss stake, tenor, and fee values.",
   OriginatorNotApproved: "This wallet is not an approved originator yet. Ask Anora to approve it before opening a facility.",
+  JuniorProtectionBreached: "This withdrawal would leave Senior capital without its required protection. Withdraw less, or wait until Senior capital leaves or the facility closes.",
   PastDue: "This facility is past its due date, so no more liquidity can be drawn.",
   LimitExceeded: "This drawdown would exceed the facility's credit limit.",
   InsufficientLiquidity: "The facility does not have enough free liquidity for this right now.",
