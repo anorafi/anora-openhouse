@@ -2,6 +2,7 @@ import { createPublicClient, createWalletClient, http, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { arbitrumSepolia } from "viem/chains";
 import { AnoraFacilityAbi } from "../../web/src/abi/AnoraFacility";
+import { metadataApi } from "./metadataApi";
 
 const api = process.env.SEED_API ?? "https://anora-api.dimsky.xyz";
 const rpc = process.env.ARBITRUM_SEPOLIA_RPC ?? "https://sepolia-rollup.arbitrum.io/rpc";
@@ -16,32 +17,7 @@ const SAMPLES = [
   { company: "Kochi Spice Exports Pvt", route: "India to United Arab Emirates", financingType: "Supply-chain finance", operatingHistoryYears: 7, verifiedAssets: 18, buyerConcentrationPct: 52, documentCoverage: 1.09 },
 ];
 
-async function call(path: string, init: RequestInit = {}) {
-  const response = await fetch(`${api}${path}`, init);
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`${init.method ?? "GET"} ${path} -> ${response.status} ${JSON.stringify(body.error ?? body)}`);
-  return body as Record<string, any>;
-}
-
-async function login(account: typeof originator): Promise<string> {
-  const issued = await call("/v1/auth/nonce", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: account.address, chainId }) });
-  const signature = await account.signMessage({ message: issued.message });
-  const opened = await call("/v1/auth/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: issued.message, signature }) });
-  return opened.token;
-}
-
-const post = (path: string, token: string, body: unknown) => call(path, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
-
-function samplePdf(title: string): Uint8Array {
-  return new TextEncoder().encode(`%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 100]>>endobj\n%${title}\ntrailer<</Root 1 0 R>>\n%%EOF\n`);
-}
-
-async function upload(token: string, path: string, name: string, visibility: "public" | "restricted") {
-  const bytes = samplePdf(name);
-  const slot = await post(`${path}/documents/upload-url`, token, { name, mime: "application/pdf", size: bytes.length, visibility });
-  const stored = await call(slot.uploadUrl, { method: "PUT", headers: { "content-type": "application/pdf" }, body: bytes });
-  return stored;
-}
+const { call, login, post, upload } = metadataApi(api, chainId);
 
 const listed = (name: string) => (process.env[name] ?? "").split(",").map((entry) => entry.trim().toLowerCase()).filter(Boolean);
 const withoutAnchor = new Set(listed("SEED_SKIP_ANCHOR"));
