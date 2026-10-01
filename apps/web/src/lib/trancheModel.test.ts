@@ -112,6 +112,15 @@ describe("planTranches fixtures", () => {
   });
 });
 
+describe("planTranches named fixture shared with the contract tests", () => {
+  test("a commodity facility at a 30 percent stake plans a ratio of 21,880 bps and a cap of 95,642,572 units", () => {
+    const result = plan();
+    expect(result.seniorPerJuniorBps).toBe(21_880n);
+    expect(result.capitalCap).toBe(95_642_572n);
+    expect(result.seniorCapacity).toBe(65_642_572n);
+  });
+});
+
 describe("planTranches determinism and snapshot", () => {
   test("identical inputs and policy produce identical output and hash", () => {
     const a = plan();

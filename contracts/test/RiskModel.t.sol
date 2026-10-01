@@ -292,4 +292,35 @@ contract RiskModelTest is Test {
         f.withdraw(AnoraFacility.Tranche.Junior, shares);
         if (!breaches) assertEq(f.juniorShares(junior1), f.juniorTotalShares());
     }
+
+    function test_theModelFixtureIsEnforcedByTheContract() public {
+        AnoraFacility.Terms memory terms = AnoraFacility.Terms({
+            limit: 100 * USDC,
+            firstLoss: 30 * USDC,
+            tenor: 90 days,
+            grace: 14 days,
+            financingFeeBps: 500,
+            lateFeePerDayBps: 10,
+            seniorPerJuniorBps: 21_880,
+            seniorFeeShareBps: 6_000,
+            capitalCap: 95_642_572
+        });
+        vm.prank(originator);
+        AnoraFacility f = AnoraFacility(factory.createFacilityWithModel("Fixture", terms, 1, keccak256("fixture")));
+        _approveAll(f);
+        uint256 capacity = f.seniorCapacity();
+        assertEq(capacity, 65_640_000);
+        assertLe(capacity, 65_642_572);
+        vm.prank(senior1);
+        vm.expectRevert(AnoraFacility.SeniorCapacityExceeded.selector);
+        f.deposit(AnoraFacility.Tranche.Senior, capacity + 1);
+        _deposit(f, senior1, AnoraFacility.Tranche.Senior, capacity);
+        assertEq(f.seniorCapacity(), 0);
+        uint256 room = 95_642_572 - f.totalCapital();
+        vm.prank(junior1);
+        vm.expectRevert(AnoraFacility.CapitalCapExceeded.selector);
+        f.deposit(AnoraFacility.Tranche.Junior, room + 1);
+        _deposit(f, junior1, AnoraFacility.Tranche.Junior, room);
+        assertEq(f.totalCapital(), 95_642_572);
+    }
 }
