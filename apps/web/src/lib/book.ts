@@ -48,6 +48,7 @@ export interface Facility {
   seniorAvailable: number;
   juniorAvailable: number;
   seniorFeeShareBps: number;
+  seniorPerJuniorBps: number;
   limit: number;
   firstLoss: number;
   supplied: number;
@@ -159,6 +160,7 @@ export function toFacility(data: FacilityData, position: Position, totals: Total
     seniorAvailable,
     juniorAvailable,
     seniorFeeShareBps: Number(data.terms.seniorFeeShareBps),
+    seniorPerJuniorBps: Number(data.terms.seniorPerJuniorBps),
     limit,
     firstLoss,
     supplied: fromUnits(claimableAssets(data)),

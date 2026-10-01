@@ -58,3 +58,12 @@ export function trancheReturn({ feePct, seniorFeeShareBps, tranche, amount, seni
   if (tranche === "senior") return feePct * seniorShare * (pool / senior);
   return feePct * (1 - seniorShare) * (pool / junior);
 }
+
+export const trancheIndex = (tranche: Tranche) => (tranche === "senior" ? 0 : 1);
+
+export function holdingTranches(holding: { seniorShares: bigint; juniorShares: bigint }) {
+  if (holding.seniorShares > 0n && holding.juniorShares > 0n) return "Senior and Junior";
+  if (holding.seniorShares > 0n) return "Senior";
+  if (holding.juniorShares > 0n) return "Junior";
+  return "";
+}

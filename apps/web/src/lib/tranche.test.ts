@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { trancheReturn, trancheStructure } from "./tranche";
+import { holdingTranches, trancheIndex, trancheReturn, trancheStructure } from "./tranche";
 
 const input = { limit: 10, firstLoss: 3, seniorPerJuniorBps: 22_500, seniorAssets: 0, juniorAssets: 0 };
 
@@ -61,5 +61,21 @@ describe("trancheReturn", () => {
   it("is zero without an amount", () => {
     expect(trancheReturn({ ...base, tranche: "senior", amount: 0 })).toBe(0);
     expect(trancheReturn({ ...base, tranche: "junior", amount: 0 })).toBe(0);
+  });
+});
+
+describe("trancheIndex", () => {
+  it("maps each tranche to the contract enum value", () => {
+    expect(trancheIndex("senior")).toBe(0);
+    expect(trancheIndex("junior")).toBe(1);
+  });
+});
+
+describe("holdingTranches", () => {
+  it("names the tranches a wallet holds shares in", () => {
+    expect(holdingTranches({ seniorShares: 5n, juniorShares: 0n })).toBe("Senior");
+    expect(holdingTranches({ seniorShares: 0n, juniorShares: 2n })).toBe("Junior");
+    expect(holdingTranches({ seniorShares: 5n, juniorShares: 2n })).toBe("Senior and Junior");
+    expect(holdingTranches({ seniorShares: 0n, juniorShares: 0n })).toBe("");
   });
 });
