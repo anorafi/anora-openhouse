@@ -33,6 +33,18 @@ describe("deriveFacility", () => {
     expect(f.limit).toBe("10000000");
   });
 
+  test("carries no model for a facility created without one", () => {
+    expect(deriveFacility([created()], NOW)!.model).toBeNull();
+  });
+
+  test("carries the frozen model terms when the factory recorded them", () => {
+    const snapshot = "0x" + "cd".repeat(32);
+    const frozen = ev("TermsFrozen", { facility: FACILITY, modelVersion: 1n, snapshotHash: snapshot, seniorPerJuniorBps: 21_880n, capitalCap: 9_564_257n }, FACTORY);
+    const f = deriveFacility([created(), frozen, deposit()], NOW)!;
+    expect(f.model).toEqual({ version: "1", snapshotHash: snapshot, seniorPerJuniorBps: "21880", capitalCap: "9564257" });
+    expect(f.status).toBe("FUNDED");
+  });
+
   test("is FUNDED once capital is supplied and nothing is drawn", () => {
     block = 0;
     const f = deriveFacility([created(), deposit()], NOW)!;

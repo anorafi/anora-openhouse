@@ -1,0 +1,26 @@
+{
+  "arbitrumSepolia": {
+    "chainId": 421614,
+    "deployedAt": "2026-10-01",
+    "asset": "0x38513243bA873d05b8b1E6622fE12e7685E4eAc6",
+    "assetSymbol": "TestUSDC",
+    "AnoraFactory": "0x803dB6d7581405a24209487Eb23c274Fd31Ec8BA",
+    "AnoraFacilityImplementation": "0x0E8B610C21d27CEA6409c724f6C9c4F7a219778F",
+    "riskAgent": "0x77E6296ff0b10eDc6e74a38c491c3e28c501D064",
+    "minFirstLossBps": 1000,
+    "note": "ano-41 side by side, not published to the manifest",
+    "deploymentBlock": 314678558
+  },
+  "robinhood": {
+    "chainId": 4663,
+    "deployedAt": "2026-10-01",
+    "asset": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+    "assetSymbol": "USDG",
+    "AnoraFactory": "0x80A71bb4715F2dCAea8cDa57FC3f6C297b9E742B",
+    "AnoraFacilityImplementation": "0xf437d4072067C1225c7ebF14E9291222a260F3fD",
+    "riskAgent": "0x77E6296ff0b10eDc6e74a38c491c3e28c501D064",
+    "minFirstLossBps": 1000,
+    "note": "ano-41 side by side, not published to the manifest",
+    "deploymentBlock": 77485575
+  }
+}

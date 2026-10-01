@@ -18,7 +18,7 @@ const network = (chainId: number, key: string, overrides: Record<string, unknown
   asset: { address: address(1), symbol: "TestUSDC", decimals: 6, faucet: true },
   contracts: { factory: address(2), facilityImplementation: address(3) },
   deploymentBlock: "1",
-  features: { writes: true, gaslessOriginator: false, duneAnalytics: false },
+  features: { writes: true, gaslessOriginator: false, duneAnalytics: false, riskModel: false },
   ...overrides,
 });
 

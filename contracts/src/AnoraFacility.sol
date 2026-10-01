@@ -54,6 +54,7 @@ contract AnoraFacility is Initializable, ReentrancyGuard, IRiskAgentSource {
     error Overpayment();
     error NothingToRecover();
     error ZeroAddress();
+    error JuniorProtectionBreached();
 
     uint256 public constant BPS = 10_000;
 
@@ -83,6 +84,8 @@ contract AnoraFacility is Initializable, ReentrancyGuard, IRiskAgentSource {
     uint256 public lossJunior;
     uint256 public lossSenior;
     bytes32 public evidenceHash;
+    uint256 public modelVersion;
+    bytes32 public snapshotHash;
 
     event Deposited(address indexed provider, Tranche tranche, uint256 assets, uint256 shares);
     event Withdrawn(address indexed provider, Tranche tranche, uint256 assets, uint256 shares);
@@ -103,6 +106,24 @@ contract AnoraFacility is Initializable, ReentrancyGuard, IRiskAgentSource {
         external
         initializer
     {
+        _configure(asset_, originator_, name_, terms_);
+    }
+
+    /// @notice Same as initialize, and records the model version and snapshot hash the terms were derived from. Both are immutable.
+    function initializeWithModel(
+        address asset_,
+        address originator_,
+        string calldata name_,
+        Terms calldata terms_,
+        uint256 modelVersion_,
+        bytes32 snapshotHash_
+    ) external initializer {
+        _configure(asset_, originator_, name_, terms_);
+        modelVersion = modelVersion_;
+        snapshotHash = snapshotHash_;
+    }
+
+    function _configure(address asset_, address originator_, string calldata name_, Terms calldata terms_) internal {
         if (asset_ == address(0) || originator_ == address(0)) revert ZeroAddress();
         factory = msg.sender;
         asset = IERC20(asset_);
@@ -171,10 +192,18 @@ contract AnoraFacility is Initializable, ReentrancyGuard, IRiskAgentSource {
             juniorShares[msg.sender] -= shares;
             juniorTotalShares -= shares;
             juniorAssets -= amount;
+            if (!_seniorProtected()) revert JuniorProtectionBreached();
         }
         if (amount > liquidity()) revert InsufficientLiquidity();
         asset.safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, tranche, amount, shares);
+    }
+
+    /// @notice Junior capital may leave only while Senior capital that is still exposed keeps its calculated protection.
+    function _seniorProtected() internal view returns (bool) {
+        if (status != Status.Open && status != Status.Late) return true;
+        if (seniorAssets == 0) return true;
+        return seniorAssets <= (juniorAssets + firstLossReserve) * terms.seniorPerJuniorBps / BPS;
     }
 
     /// @notice Originator draws liquidity up to the limit. The financing fee is booked at drawdown.

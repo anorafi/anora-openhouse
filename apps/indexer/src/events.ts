@@ -29,6 +29,7 @@ export interface IndexedEvent {
 
 export const INDEXED_EVENTS = new Set([
   "FacilityCreated",
+  "TermsFrozen",
   "RiskAgentChanged",
   "MinFirstLossChanged",
   "OriginatorApprovalChanged",
@@ -83,7 +84,7 @@ export function normalizeLog(chainId: number, log: RawLog): IndexedEvent | null 
   if (name === "Deposited" || name === "Withdrawn") data.tranche = plain("tranche", Number(args.tranche));
   const actorField = ACTOR_FIELDS[name];
   const actor = actorField ? ((data[actorField] as string | undefined) ?? null) : null;
-  const facility = name === "FacilityCreated" ? (data.facility as string) : log.address.toLowerCase();
+  const facility = name === "FacilityCreated" || name === "TermsFrozen" ? (data.facility as string) : log.address.toLowerCase();
   return {
     schemaVersion: 1,
     id: `${chainId}:${log.transactionHash}:${log.logIndex}`,

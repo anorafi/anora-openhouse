@@ -261,6 +261,91 @@ export const AnoraFacilityAbi = [
   },
   {
     "type": "function",
+    "name": "initializeWithModel",
+    "inputs": [
+      {
+        "name": "asset_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "originator_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "name_",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "terms_",
+        "type": "tuple",
+        "internalType": "struct AnoraFacility.Terms",
+        "components": [
+          {
+            "name": "limit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "firstLoss",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "tenor",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "grace",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "financingFeeBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "lateFeePerDayBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "seniorPerJuniorBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "seniorFeeShareBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "capitalCap",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "modelVersion_",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "snapshotHash_",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "juniorAssets",
     "inputs": [],
     "outputs": [
@@ -414,6 +499,19 @@ export const AnoraFacilityAbi = [
   },
   {
     "type": "function",
+    "name": "modelVersion",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "name",
     "inputs": [],
     "outputs": [
@@ -557,6 +655,19 @@ export const AnoraFacilityAbi = [
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "snapshotHash",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -922,6 +1033,11 @@ export const AnoraFacilityAbi = [
   {
     "type": "error",
     "name": "InvalidInitialization",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "JuniorProtectionBreached",
     "inputs": []
   },
   {

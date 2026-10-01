@@ -24,4 +24,10 @@ describe("describeContractError", () => {
     const message = describeContractError(revert(AnoraFacilityAbi, "PastDue", "drawdown"));
     expect(message).toMatch(/due date/i);
   });
+
+  it("explains a Junior withdrawal that would leave Senior without its protection", () => {
+    const message = describeContractError(revert(AnoraFacilityAbi, "JuniorProtectionBreached", "withdraw"));
+    expect(message).toMatch(/senior/i);
+    expect(message).toMatch(/protection/i);
+  });
 });

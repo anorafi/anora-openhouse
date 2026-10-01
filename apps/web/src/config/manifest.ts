@@ -24,7 +24,7 @@ export interface ManifestNetwork {
   asset: { address: Address; symbol: string; decimals: number; faucet: boolean };
   contracts: { factory: Address; facilityImplementation: Address };
   deploymentBlock: string;
-  features: { writes: boolean; gaslessOriginator: boolean; duneAnalytics: boolean };
+  features: { writes: boolean; gaslessOriginator: boolean; duneAnalytics: boolean; riskModel: boolean };
 }
 
 export interface Manifest {
@@ -44,6 +44,7 @@ export interface Deployment {
   explorer: string;
   confirmations: number;
   writes: boolean;
+  riskModel: boolean;
   deploymentBlock: bigint;
   logsApi?: string;
   indexerApi?: string;
@@ -124,6 +125,7 @@ function parseNetwork(value: unknown, index: number): ManifestNetwork {
       writes: flag(features.writes, `${at}.features.writes`),
       gaslessOriginator: flag(features.gaslessOriginator, `${at}.features.gaslessOriginator`),
       duneAnalytics: flag(features.duneAnalytics, `${at}.features.duneAnalytics`),
+      riskModel: features.riskModel === undefined ? false : flag(features.riskModel, `${at}.features.riskModel`),
     },
   };
 }
@@ -170,6 +172,7 @@ export function deploymentOf(network: ManifestNetwork): Deployment {
     explorer: network.explorerUrl,
     confirmations: network.confirmations,
     writes: network.features.writes,
+    riskModel: network.features.riskModel,
     deploymentBlock: BigInt(network.deploymentBlock),
     logsApi: network.logsApi,
     indexerApi: network.indexerApi,

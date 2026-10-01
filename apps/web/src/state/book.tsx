@@ -18,6 +18,7 @@ import { FAUCET_AMOUNT, faucetVisible } from "../lib/faucet";
 import { guardedWrite } from "../lib/guardedWrite";
 import { depositedBy, eventsFrom, totalsFrom, type BookEvent } from "../lib/history";
 import { trancheIndex, type Tranche } from "../lib/tranche";
+import { createFacilityCall, planFacility } from "../lib/facilityPlan";
 import { FACILITY_DEFAULTS, GRACE_PRESETS, TENOR_PRESETS, defaultTerms, type Terms } from "../lib/terms";
 
 export type { Facility, Stage } from "../lib/book";
@@ -147,24 +148,32 @@ export function BookProvider({ children }: { children: ReactNode }) {
 
   const createFacility = useCallback(async (input: NewFacility) => {
     if (!deployment) throw new Error("No deployment on this network.");
-    const limit = toUnits(input.limit);
+    const plan = planFacility({
+      riskModel: deployment.riskModel,
+      faucet: deployment.faucet,
+      limit: input.limit,
+      firstLoss: input.firstLoss,
+      financingType: input.listing.type,
+      route: input.listing.route,
+      tenorSeconds: input.tenorSeconds,
+      graceSeconds: input.graceSeconds,
+    });
+    if (plan.blocked) throw new Error("Listing is blocked until verified underwriting data exists for this facility.");
     await approveUnits(deployment.factory, toUnits(input.firstLoss));
-    await send({
-      ...factoryContract(deployment.factory),
-      chainId,
-      functionName: "createFacility",
-      args: [encodeFacilityName(input.listing), {
-        limit,
+    const call = createFacilityCall(
+      encodeFacilityName(input.listing),
+      {
+        limit: toUnits(input.limit),
         firstLoss: toUnits(input.firstLoss),
         tenor: BigInt(Math.round(input.tenorSeconds)),
         grace: BigInt(Math.round(input.graceSeconds)),
         financingFeeBps: BigInt(Math.round(input.feePct * 100)),
         lateFeePerDayBps: BigInt(FACILITY_DEFAULTS.lateFeePerDayBps),
-        seniorPerJuniorBps: BigInt(FACILITY_DEFAULTS.seniorPerJuniorBps),
         seniorFeeShareBps: BigInt(FACILITY_DEFAULTS.seniorFeeShareBps),
-        capitalCap: limit,
-      }],
-    });
+      },
+      plan,
+    );
+    await send({ ...factoryContract(deployment.factory), chainId, ...call } as never);
   }, [approveUnits, chainId, deployment, send]);
 
   const faucet = useCallback(async () => {
@@ -323,6 +332,11 @@ const FACILITY_POOL: PoolEntry[] = [
 
 export function useDraftSize(): DraftSize {
   return draftSizeFor(useDeployment()?.faucet ?? true);
+}
+
+export function useRiskModel() {
+  const deployment = useDeployment();
+  return { riskModel: deployment?.riskModel ?? false, faucet: deployment?.faucet ?? true };
 }
 
 const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)];
