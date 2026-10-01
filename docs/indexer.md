@@ -45,7 +45,7 @@ All routes are `GET`, values that can exceed 2^53 are decimal strings, addresses
 
 An event carries `schemaVersion`, `id`, `chainId`, `blockNumber`, `blockHash`, `txHash`, `logIndex`, `confirmations`, `final`, `facility`, `event`, `actor`, `data`, `observedAt`.
 
-Facility status is derived from events: `FUNDING`, `FUNDED`, `ACTIVE` (with `pastDue` while the keeper has not marked it), `LATE`, `DEFAULTED`, `RECOVERED` (default with no outstanding loss), `REPAID`. A position is `HELD`, `CLAIMABLE` (shares left and the facility is `REPAID` or `RECOVERED`), or `SETTLED` (no shares left). Claimability is inferred from events, not read from the contract.
+Facility status is derived from events: `FUNDING`, `FUNDED`, `ACTIVE` (with `pastDue` while the keeper has not marked it), `LATE`, `DEFAULTED`, `RECOVERED` (default with no outstanding loss), `REPAID`, `CLOSED` (repaid or recovered, and every share withdrawn). The predicates are in `docs/status-model.md`. A position is `HELD`, `CLAIMABLE` (shares left and the facility is `REPAID` or `RECOVERED`), or `SETTLED` (no shares left). Claimability is inferred from events, not read from the contract.
 
 ## Errors
 
