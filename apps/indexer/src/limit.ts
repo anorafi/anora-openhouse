@@ -1,4 +1,4 @@
-export type LimitClass = "auth" | "write" | "read" | "rpc" | "exempt";
+export type LimitClass = "auth" | "approve" | "write" | "read" | "rpc" | "exempt";
 type Limited = Exclude<LimitClass, "exempt">;
 
 export interface Rule {
@@ -16,6 +16,7 @@ export interface LimiterOptions {
 
 const DEFAULT_RULES: Record<Limited, Rule> = {
   auth: { capacity: 10, perMinute: 10 },
+  approve: { capacity: 5, perMinute: 5 },
   write: { capacity: 20, perMinute: 20 },
   read: { capacity: 240, perMinute: 240 },
   rpc: { capacity: 600, perMinute: 600 },
@@ -27,6 +28,7 @@ export function classify(method: string, pathname: string): LimitClass {
   if (pathname === "/v1/health") return "exempt";
   if (pathname.startsWith("/rpc/")) return "rpc";
   if (method === "POST" && pathname.startsWith("/v1/auth/")) return "auth";
+  if (method === "POST" && pathname === "/v1/originator-approvals") return "approve";
   if (method === "POST" || method === "PUT") return "write";
   return "read";
 }

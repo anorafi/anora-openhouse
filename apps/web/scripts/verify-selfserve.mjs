@@ -11,7 +11,7 @@ const sepolia = defineChain({
 });
 const deployments = JSON.parse(readFileSync(new URL("../../../contracts/deployments.json", import.meta.url), "utf8")).arbitrumSepolia;
 const url = process.env.VERIFY_URL ?? "http://127.0.0.1:8031/";
-const shotDir = process.env.VERIFY_SHOTS ?? "/home/dims/.cache/claude-work/verify-sizing";
+const shotDir = process.env.VERIFY_SHOTS ?? "/home/dims/.cache/claude-work/verify-selfserve";
 const transport = http(sepolia.rpcUrls.default.http[0]);
 const publicClient = createPublicClient({ chain: sepolia, transport });
 const deployer = privateKeyToAccount(process.env.DEPLOYER_PRIVATE_KEY);
@@ -35,23 +35,34 @@ const record = (name, ok, detail) => {
 mkdirSync(shotDir, { recursive: true });
 
 const deployerClient = createWalletClient({ account: deployer, chain: sepolia, transport });
-const fund = await deployerClient.sendTransaction({ to: fresh.address, value: 1_000_000_000_000_000n });
+const fund = await deployerClient.sendTransaction({ to: fresh.address, value: 200_000_000_000_000n });
 await publicClient.waitForTransactionReceipt({ hash: fund });
 const ownerClient = createWalletClient({ account: owner, chain: sepolia, transport });
-const approve = await ownerClient.writeContract({ address: deployments.AnoraFactory, abi: factoryAbi, functionName: "setOriginatorApproved", args: [fresh.address, true] });
-await publicClient.waitForTransactionReceipt({ hash: approve });
-record("wallet originator baru disetujui owner di factory aktif", await publicClient.readContract({ address: deployments.AnoraFactory, abi: factoryAbi, functionName: "approvedOriginators", args: [fresh.address] }), fresh.address);
+const second = privateKeyToAccount(generatePrivateKey());
+const isApproved = (who) => publicClient.readContract({ address: deployments.AnoraFactory, abi: factoryAbi, functionName: "approvedOriginators", args: [who] });
+const ownerNonce = () => publicClient.getTransactionCount({ address: owner.address, blockTag: "latest" });
+record("wallet baru belum disetujui sebelum membuka halaman", (await isApproved(fresh.address)) === false, fresh.address);
+const preApprove = await ownerClient.writeContract({ address: deployments.AnoraFactory, abi: factoryAbi, functionName: "setOriginatorApproved", args: [second.address, true] });
+await publicClient.waitForTransactionReceipt({ hash: preApprove });
+const secondFund = await deployerClient.sendTransaction({ to: second.address, value: 20_000_000_000_000n });
+await publicClient.waitForTransactionReceipt({ hash: secondFund });
+record("wallet kedua disetujui lebih dulu oleh owner", await isApproved(second.address), second.address);
 console.log(`wallet baru ${fresh.address}, saldo awal ${await balanceOf(fresh.address)}`);
 
 let current = fresh;
+let chainHex = "0x" + sepolia.id.toString(16);
+let onSwitch = () => {};
 async function walletRequest(method, params) {
   switch (method) {
     case "eth_requestAccounts":
     case "eth_accounts":
       return [current.address];
     case "eth_chainId":
-      return "0x" + sepolia.id.toString(16);
+      return chainHex;
     case "wallet_switchEthereumChain":
+      chainHex = params[0].chainId;
+      setTimeout(() => onSwitch(), 300);
+      return null;
     case "wallet_addEthereumChain":
       return null;
     case "eth_sendTransaction": {
@@ -66,9 +77,12 @@ async function walletRequest(method, params) {
   }
 }
 
-const { page } = await getWindow(process.env.VBROWSER_AGENT ?? "verify-sizing");
+const approvalCalls = [];
+const { page } = await getWindow(process.env.VBROWSER_AGENT ?? "verify-selfserve");
 await page.setViewport({ width: 1440, height: 1000 });
 await page.setCacheEnabled(false);
+page.on("request", (r) => { if (r.url().includes("/v1/originator-approvals") && r.method() === "POST") approvalCalls.push(r.postData()); });
+onSwitch = () => page.evaluate((hex) => window.__emitWallet("chainChanged", hex), chainHex).catch(() => {});
 await page.exposeFunction("__walletRequest", async (method, params) => {
   const result = await walletRequest(method, params);
   return JSON.parse(JSON.stringify(result, (_, v) => (typeof v === "bigint" ? "0x" + v.toString(16) : v)));
@@ -172,23 +186,35 @@ try {
   const after = await balanceOf(fresh.address);
   record("satu klaim faucet mint 10.000 TestUSDC onchain", after - before === 10_000_000_000n, `${before} -> ${after}`);
 
+  const nonceBefore = await ownerNonce();
   await actAs(fresh, "Originator");
   await go("Open a facility");
   await waitText("Facility terms");
-  await sleep(3_000);
+  const sawNotice = await (async () => {
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      if ((await text()).includes("Approving this wallet as a demo originator")) return true;
+      if (await isApproved(fresh.address)) return false;
+      await sleep(400);
+    }
+    return false;
+  })();
+  record("status persetujuan otomatis tampil saat halaman Open a facility dibuka", sawNotice, sawNotice ? "terlihat" : "tidak sempat terlihat sebelum disetujui");
+  await shot("open-form-approving");
+  const approvedDeadline = Date.now() + 60_000;
+  while (Date.now() < approvedDeadline && !(await isApproved(fresh.address))) await sleep(1_500);
+  record("wallet baru disetujui on-chain otomatis (approvedOriginators true)", await isApproved(fresh.address), fresh.address);
+  await sleep(4_000);
+  record("tepat satu permintaan persetujuan ke API", approvalCalls.length === 1, `${approvalCalls.length} permintaan`);
+  record("owner mengirim tepat satu transaksi", (await ownerNonce()) - nonceBefore === 1, `${nonceBefore} -> ${await ownerNonce()}`);
+  record("catatan persetujuan hilang setelah disetujui", !(await text()).includes("Approving this wallet as a demo originator"), "bersih");
+
   const form = await page.evaluate(() => {
     const read = (prefix) => [...document.querySelectorAll("label")].find((l) => l.innerText.trim().startsWith(prefix))?.querySelector("input")?.value;
     return { name: read("Facility name"), limit: read("Credit limit"), firstLoss: read("First-loss stake") };
   });
   const limitValue = Number(form.limit.replace(/,/g, ""));
   const firstLossValue = Number(form.firstLoss.replace(/,/g, ""));
-  const balanceUnits = await balanceOf(fresh.address);
-  record("first-loss bawaan terjangkau dari satu klaim", BigInt(firstLossValue) * 1_000_000n <= balanceUnits, `limit ${limitValue}, first-loss ${firstLossValue}, saldo ${balanceUnits}`);
-  record("first-loss bawaan memenuhi batas bawah 10 persen", firstLossValue >= limitValue * 0.1, `${firstLossValue} >= ${limitValue * 0.1}`);
-  const pageText = await text();
-  record("tidak ada peringatan di bawah batas bawah", !/below the 10% floor/i.test(pageText), "bersih");
-  await shot("open-form-defaults");
-
   const countBefore = (await facilities()).length;
   await clickPrefix("Approve ");
   await clickPrefix("Clone facility and lock first-loss", 120_000);
@@ -197,15 +223,43 @@ try {
   const all = await facilities();
   const opened = all[all.length - 1];
   const terms = await publicClient.readContract({ address: opened, abi: facilityAbi, functionName: "terms" });
-  record("fasilitas dibuka dari draf bawaan tanpa mengubah angka", all.length === countBefore + 1 && terms[0] === BigInt(limitValue) * 1_000_000n && terms[1] === BigInt(firstLossValue) * 1_000_000n, `limit ${terms[0]} first-loss ${terms[1]}`);
+  record("approve lalu clone sukses dari draf bawaan setelah persetujuan otomatis", all.length === countBefore + 1 && terms[0] === BigInt(limitValue) * 1_000_000n && terms[1] === BigInt(firstLossValue) * 1_000_000n, `limit ${terms[0]} first-loss ${terms[1]}`);
   await shot("listed");
 
   await actAs(fresh, "Capital provider");
   await go("Markets");
   await waitText(form.name.split(" ").slice(0, 2).join(" "), 90_000);
-  const listed = (await text()).includes(form.name);
-  record("fasilitas baru tampil di Markets", listed, form.name);
-  await shot("markets-new-facility");
+  record("fasilitas baru tampil di Markets", (await text()).includes(form.name), form.name);
+
+  const callsBeforeSecond = approvalCalls.length;
+  const nonceBeforeSecond = await ownerNonce();
+  await actAs(second, "Originator");
+  await go("Open a facility");
+  await waitText("Facility terms");
+  await sleep(8_000);
+  record("wallet yang sudah disetujui tidak memanggil API", approvalCalls.length === callsBeforeSecond, `${approvalCalls.length - callsBeforeSecond} permintaan baru`);
+  record("wallet yang sudah disetujui tidak memicu transaksi owner", (await ownerNonce()) === nonceBeforeSecond, `nonce ${nonceBeforeSecond}`);
+  await shot("second-wallet-open-form");
+
+  const manifest = await (await fetch(new URL("manifest.json", url))).json();
+  const flags = Object.fromEntries(manifest.networks.map((entry) => [entry.chainId, entry.features.selfServeOriginator]));
+  record("manifest: swalayan menyala di Sepolia dan mati di Robinhood", flags[421614] === true && flags[4663] === false, JSON.stringify(flags));
+
+  const callsBeforeRobinhood = approvalCalls.length;
+  const balanceBefore = await publicClient.getTransactionCount({ address: fresh.address });
+  await page.evaluate(() => [...document.querySelectorAll("button")].find((b) => /Arbitrum Sepolia/.test(b.innerText))?.click());
+  await sleep(800);
+  await page.evaluate(() => [...document.querySelectorAll("button,[role='menuitem'],[role='menuitemradio']")].find((b) => /Robinhood Chain/.test(b.innerText))?.click());
+  await sleep(6_000);
+  const onRobinhood = await page.evaluate(() => /Robinhood Chain/.test(document.querySelector("header,.topbar,body")?.innerText ?? ""));
+  await actAs(fresh, "Originator").catch(() => {});
+  await go("Open a facility").catch(() => {});
+  await sleep(8_000);
+  const robinhoodText = await text();
+  record("di Robinhood tidak ada permintaan persetujuan ke API", approvalCalls.length === callsBeforeRobinhood, `${approvalCalls.length - callsBeforeRobinhood} permintaan baru`);
+  record("di Robinhood tidak ada catatan persetujuan otomatis", !robinhoodText.includes("Approving this wallet as a demo originator"), onRobinhood ? "jaringan Robinhood aktif" : "jaringan tidak sempat berpindah");
+  record("pengujian Robinhood tidak mengirim transaksi", (await publicClient.getTransactionCount({ address: fresh.address })) === balanceBefore, "nonce wallet uji tidak berubah");
+  await shot("robinhood-open-form");
 } catch (error) {
   record("alur terhenti", false, String(error.message ?? error));
   await shot("error").catch(() => {});

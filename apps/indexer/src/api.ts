@@ -24,6 +24,7 @@ export interface ApiDeps {
   now: () => number;
   origins: string[];
   meta?: (request: Request, url: URL) => Promise<Response | null>;
+  approvals?: (request: Request, url: URL) => Promise<Response | null>;
   limiter?: ReturnType<typeof createLimiter>;
   rpc?: (chainId: number, payload: unknown) => Promise<RpcReply>;
 }
@@ -242,6 +243,13 @@ export function createHandler(deps: ApiDeps) {
       const bounded = await capped(request, MAX_JSON_BYTES);
       if (!bounded) return send({ error: { code: "PAYLOAD_TOO_LARGE", message: "Request body is too large." } }, 413, cors);
       request = bounded;
+    }
+    if (deps.approvals) {
+      const handled = await deps.approvals(request, url);
+      if (handled) {
+        for (const [name, value] of Object.entries(cors)) handled.headers.set(name, value);
+        return handled;
+      }
     }
     if (deps.meta) {
       const handled = await deps.meta(request, url);

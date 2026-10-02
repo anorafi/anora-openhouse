@@ -12,6 +12,11 @@ describe("classify", () => {
     expect(classify("POST", "/v1/auth/verify")).toBe("auth");
   });
 
+  test("puts originator approvals in their own class", () => {
+    expect(classify("POST", "/v1/originator-approvals")).toBe("approve");
+    expect(classify("GET", "/v1/originator-approvals")).toBe("read");
+  });
+
   test("puts writes and uploads in the write class", () => {
     expect(classify("POST", "/v1/facilities/421614/0xabc/metadata/versions")).toBe("write");
     expect(classify("POST", "/v1/facilities/421614/0xabc/underwriting/approve")).toBe("write");
@@ -106,5 +111,18 @@ describe("rpc class", () => {
     let taken = 0;
     while (limiter.take("a", "rpc").ok && taken < 1000) taken += 1;
     expect(taken).toBe(600);
+  });
+});
+
+describe("approve class", () => {
+  test("allows five approvals a minute per client", () => {
+    const time = clock();
+    const limiter = createLimiter({ now: time.now });
+    for (let i = 0; i < 5; i += 1) expect(limiter.take("1.2.3.4", "approve").ok).toBe(true);
+    const sixth = limiter.take("1.2.3.4", "approve");
+    expect(sixth.ok).toBe(false);
+    expect(limiter.take("5.6.7.8", "approve").ok).toBe(true);
+    time.advance(12_000);
+    expect(limiter.take("1.2.3.4", "approve").ok).toBe(true);
   });
 });
