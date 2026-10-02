@@ -8,7 +8,7 @@ import { useTx } from "../hooks/useTx";
 import { trancheStructure, type TrancheStructure as Structure } from "../lib/tranche";
 import { planFacility } from "../lib/facilityPlan";
 import { FACILITY_DEFAULTS, GRACE_PRESETS, TENOR_PRESETS, defaultTerms, termsLabel, termsValid, toSeconds, unitsFor, type TenorUnit } from "../lib/terms";
-import { fundingState, DEFAULT_STAGES, ORIGINATOR_ACTION, STAGE_LABEL, eventTime, isMine, owedOn, waterfallOf, randomDraft, useBook, useDraftSize, useMoney, useRiskModel, type BookEvent, type Facility, type Stage } from "../state/book";
+import { fundingState, DEFAULT_STAGES, ORIGINATOR_ACTION, STAGE_LABEL, eventTime, originatorBook, owedOn, waterfallOf, randomDraft, useBook, useDraftSize, useMoney, useRiskModel, type BookEvent, type Facility, type Stage } from "../state/book";
 
 /** Protocol-level floor, mirroring minFirstLossBps on the factory. */
 const MIN_FIRST_LOSS_BPS = 1_000;
@@ -69,7 +69,7 @@ const DURATIONS: Array<{ label: string; holds: (facility: Facility) => boolean }
 export function OriginatorFacilities({ onManage, onOpen }: { onManage: (id: string) => void; onOpen: () => void }) {
   const { facilities: book, me, symbol } = useBook();
   const usd = amountIn(symbol);
-  const facilities = useMemo(() => book.filter((facility) => isMine(facility, me)), [book, me]);
+  const facilities = useMemo(() => originatorBook(book, me), [book, me]);
   const [query, setQuery] = useState("");
   const [type, setType] = useState("All");
   const [duration, setDuration] = useState("All");
