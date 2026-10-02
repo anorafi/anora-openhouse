@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FacilityData } from "../hooks/useFacilities";
 import { draftSizeFor, durationText, fromUnits, fundingState, marketAction, realizedReturn, stageOf, toFacility, toUnits, waterfallOf, type Facility } from "./book";
-import { originatorBook } from "../state/book";
 import { encodeFacilityName } from "./facilityName";
 
 const U = 1_000_000n;
@@ -229,16 +228,5 @@ describe("tranche availability", () => {
     const funded = open({ juniorAssets: 2n * U, juniorTotalShares: 2n * U, totalCapital: 5n * U, seniorCapacity: 11_250_000n });
     expect(funded.juniorPct).toBeCloseTo(20, 6);
     expect(funded.juniorSupplied).toBe(2);
-  });
-});
-
-describe("originatorBook", () => {
-  const facility = (originator: `0x${string}`) => toFacility(data({ originator }), { seniorShares: 0n, juniorShares: 0n });
-
-  it("uses the connected originator's facilities, or the shared demo book when none belong to them", () => {
-    const owned = facility(ORIGINATOR);
-    const other = facility("0x00000000000000000000000000000000000000cc");
-    expect(originatorBook([owned, other], ORIGINATOR)).toEqual([owned]);
-    expect(originatorBook([owned, other], ADDRESS)).toEqual([owned, other]);
   });
 });

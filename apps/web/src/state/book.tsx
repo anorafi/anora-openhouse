@@ -250,12 +250,6 @@ export function useMoney() {
 
 export const isMine = (facility: Facility, me: Address | undefined) => !!me && facility.originator.toLowerCase() === me.toLowerCase();
 
-/** Keep the demo workspace populated from the same book capital providers see. */
-export const originatorBook = (facilities: Facility[], me: Address | undefined) => {
-  const mine = facilities.filter((facility) => isMine(facility, me));
-  return mine.length > 0 ? mine : facilities;
-};
-
 export function owedOn(facility: Facility) {
   if (facility.stage === "drawn" || facility.stage === "late") return facility.owed;
   return facility.drawn * (1 + facility.feePct / 100);
