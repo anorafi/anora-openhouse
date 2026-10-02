@@ -2,6 +2,7 @@ import { TokenAmount } from "./TokenAmount";
 import { useMemo, useState, type CSSProperties } from "react";
 import { AmountInput } from "./AmountInput";
 import { FilterBar, presentOptions } from "./FilterBar";
+import { useOriginatorApproval } from "../hooks/useOriginatorApproval";
 import { useTx } from "../hooks/useTx";
 import { trancheStructure, type TrancheStructure as Structure } from "../lib/tranche";
 import { planFacility } from "../lib/facilityPlan";
@@ -435,6 +436,7 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
   const size = useDraftSize();
   const risk = useRiskModel();
   const tx = useTx();
+  const approval = useOriginatorApproval();
   const [form, setForm] = useState(() => randomDraft(facilities.map((facility) => facility.name), size));
   const [phase, setPhase] = useState<OpenPhase>("approve");
   const started = phase !== "approve" || tx.busy;
@@ -530,9 +532,10 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
         {!meetsFloor && limitValue > 0 && <p className="facility-warn">First-loss stake is below the {MIN_FIRST_LOSS_BPS / 100}% floor.</p>}
         {!affordable && <p className="facility-warn">First-loss stake is more than your wallet balance.</p>}
 
-        <button className="accent-button wide" disabled={!canOpen || tx.busy} onClick={next}>
+        <button className="accent-button wide" disabled={!canOpen || tx.busy || approval.pending} onClick={next}>
           {tx.busy ? "Confirm in wallet…" : phase === "approve" ? `Approve ${symbol}` : <><LockIcon />Clone facility and lock first-loss</>}
         </button>
+        {approval.notice && <p className="facility-warn">{approval.notice}</p>}
         {tx.error && <p className="facility-warn">{tx.error}</p>}
         <small>{phase === "approve"
           ? "Two signatures: approve the stake, then open the facility. Nothing is listed until the second."
