@@ -402,3 +402,41 @@ describe("rpc proxy route", () => {
     expect(response.status).toBe(404);
   });
 });
+
+describe("approval routes", () => {
+  const build = (ms = 0) =>
+    createHandler({
+      db: openDb(":memory:"),
+      networks: [{ chainId: 421614, key: "arbitrum-sepolia", name: "Arbitrum Sepolia", confirmations: 2 }],
+      status: new Map(),
+      maxLag: 50n,
+      now: () => NOW,
+      origins: ["https://openhouse.anora.finance"],
+      limiter: createLimiter({ now: () => ms }),
+      approvals: async (request, url) => (url.pathname === "/v1/originator-approvals" && request.method === "POST" ? new Response(JSON.stringify({ approved: true }), { status: 200, headers: { "content-type": "application/json" } }) : null),
+    });
+
+  const approve = (handle: ReturnType<typeof build>, origin = "https://openhouse.anora.finance") =>
+    handle(new Request("http://127.0.0.1:8100/v1/originator-approvals", { method: "POST", headers: { origin, "content-type": "application/json" }, body: "{}" }));
+
+  test("hands approval requests to the approval module with cors headers", async () => {
+    const response = await approve(build());
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://openhouse.anora.finance");
+    expect(await response.json()).toEqual({ approved: true });
+  });
+
+  test("rate limits approvals to five a minute and keeps cors on the refusal", async () => {
+    const handle = build();
+    for (let i = 0; i < 5; i += 1) expect((await approve(handle)).status).toBe(200);
+    const sixth = await approve(handle);
+    expect(sixth.status).toBe(429);
+    expect(sixth.headers.get("access-control-allow-origin")).toBe("https://openhouse.anora.finance");
+    expect((await sixth.json()).error.code).toBe("RATE_LIMITED");
+  });
+
+  test("gives no cors header to an unknown origin", async () => {
+    const response = await approve(build(), "https://evil.example");
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+});

@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import { dirname } from "node:path";
 import type { Hex } from "viem";
 import { parseManifest } from "../../web/src/config/manifest";
+import { createApprovalRoutes, createApprovalsChain } from "./approvals";
 import { createHandler, type ChainStatus } from "./api";
 import { createChainClient } from "./client";
 import { openDb } from "./db";
@@ -91,6 +92,15 @@ const meta = createMetaRoutes({
   maxFileBytes,
 });
 
+const selfServe = networks.filter((network) => network.features.selfServeOriginator).map((network) => ({ chainId: network.chainId, factory: network.contracts.factory as Hex }));
+const ownerKey = process.env.SEPOLIA_OWNER_PRIVATE_KEY as Hex | undefined;
+const approvals = createApprovalRoutes({
+  chains: selfServe,
+  ownerReady: Boolean(ownerKey && /^0x[0-9a-fA-F]{64}$/.test(ownerKey)),
+  now: () => Date.now(),
+  chain: createApprovalsChain({ ownerKey, urls: Object.fromEntries(networks.map((network) => [network.chainId, directUrls(network)])) }),
+});
+
 const handler = createHandler({
   db,
   networks: networks.map((network) => ({ chainId: network.chainId, key: network.key, name: network.name, confirmations: network.confirmations })),
@@ -99,6 +109,7 @@ const handler = createHandler({
   now: clock,
   origins,
   meta,
+  approvals,
   limiter: createLimiter({ now: () => Date.now() }),
   rpc: (chainId, payload) => rpcProxy.handle(chainId, payload),
 });
