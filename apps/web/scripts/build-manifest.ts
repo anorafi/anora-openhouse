@@ -111,7 +111,7 @@ async function buildNetwork(key: string, entry: RawDeployment) {
     asset: { address: entry.asset as Address, symbol: entry.assetSymbol, decimals: assetDecimals, faucet: entry.faucet },
     contracts: { factory, facilityImplementation: entry.AnoraFacilityImplementation as Address },
     deploymentBlock: block.toString(),
-    features: { writes: true, gaslessOriginator: false, duneAnalytics: false, riskModel: process.env.RISK_MODEL === "1" },
+    features: { writes: true, gaslessOriginator: false, duneAnalytics: false, riskModel: process.env.RISK_MODEL === "1", selfServeOriginator: entry.faucet && process.env.SELF_SERVE_ORIGINATOR !== "0" },
   };
   return {
     network,

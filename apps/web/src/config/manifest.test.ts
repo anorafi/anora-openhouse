@@ -74,6 +74,24 @@ describe("parseManifest", () => {
     expect(() => parseManifest(manifest({ networks: [bad] }))).toThrow(/riskModel/);
   });
 
+  it("treats self-serve originator approval as off when the manifest does not mention it", () => {
+    const parsed = parseManifest(manifest());
+    expect(parsed.networks[0].features.selfServeOriginator).toBe(false);
+    expect(deploymentOf(parsed.networks[0]).selfServeOriginator).toBe(false);
+  });
+
+  it("reads the self-serve originator flag per network", () => {
+    const on = network({ features: { writes: true, gaslessOriginator: false, duneAnalytics: false, selfServeOriginator: true } });
+    const parsed = parseManifest(manifest({ networks: [on, robinhood()] }));
+    expect(deploymentOf(parsed.networks[0]).selfServeOriginator).toBe(true);
+    expect(deploymentOf(parsed.networks[1]).selfServeOriginator).toBe(false);
+  });
+
+  it("rejects a self-serve originator flag that is not a boolean", () => {
+    const bad = network({ features: { writes: true, gaslessOriginator: false, duneAnalytics: false, selfServeOriginator: "yes" } });
+    expect(() => parseManifest(manifest({ networks: [bad] }))).toThrow(/selfServeOriginator/);
+  });
+
   it("rejects anything that is not an object", () => {
     expect(() => parseManifest(null)).toThrow(ManifestError);
     expect(() => parseManifest("nope")).toThrow(ManifestError);
@@ -172,6 +190,7 @@ describe("deploymentOf", () => {
       confirmations: 2,
       writes: true,
       riskModel: false,
+      selfServeOriginator: false,
       deploymentBlock: 19434064n,
       logsApi: undefined,
       indexerApi: undefined,

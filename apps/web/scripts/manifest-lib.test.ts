@@ -86,7 +86,7 @@ describe("assembleManifest", () => {
     asset: { address: address(1), symbol: "TestUSDC", decimals: 6, faucet: true },
     contracts: { factory: address(2), facilityImplementation: address(3) },
     deploymentBlock: "10",
-    features: { writes: true, gaslessOriginator: false, duneAnalytics: false, riskModel: false },
+    features: { writes: true, gaslessOriginator: false, duneAnalytics: false, riskModel: false, selfServeOriginator: false },
   });
 
   it("produces a document the web parser accepts", () => {
