@@ -348,15 +348,15 @@ export function Portfolio({ notice, latestSupplyId, onView, onActivity, live, on
         {positions.length === 0
           ? <p className="empty-state">No open positions yet. Supply capital from Markets to start one.</p>
           : positions.map(({ facility, value: amount }) => <div className="table-row" key={facility.id}>
-            <span>{facility.id === latestSupplyId && <i className="recent-supply-dot" role="img" aria-label="Most recently supplied" title="Most recently supplied" />}{facility.name}{holdingTranches(facility.holding) && <small className="position-tranche"> · {holdingTranches(facility.holding)}</small>}</span>
+            <div className="position-name"><span>{facility.id === latestSupplyId && <i className="recent-supply-dot" role="img" aria-label="Most recently supplied" title="Most recently supplied" />}<strong>{facility.name}</strong></span>{holdingTranches(facility.holding) && <small className="position-tranche">{holdingTranches(facility.holding)}</small>}</div>
             <span><TokenAmount value={facility.holding.supplied} asset={facility.asset} /></span>
             <span className={amount < facility.holding.supplied ? "negative" : ""}><TokenAmount value={amount} asset={facility.asset} /></span>
             <span>{facility.targetReturn}%</span>
             <span>{DEFAULT_STAGES.includes(facility.stage) ? "In default" : onDate(maturityOf(facility))}</span>
             <span className={`market-status ${facility.stage}`}>{STAGE_LABEL[facility.stage]}</span>
             {facility.stage === "repaid" || facility.stage === "recovered"
-              ? <button disabled={tx.busy} onClick={() => tx.run(() => onClaim(facility.id))}>Claim</button>
-              : <button onClick={() => onView(facility.id)}>View</button>}
+              ? <button className="position-action claim" disabled={tx.busy} onClick={() => tx.run(() => onClaim(facility.id))}>Claim</button>
+              : <button className="position-action" onClick={() => onView(facility.id)}>View <span aria-hidden="true">→</span></button>}
           </div>)}
       </div>
     </section>
