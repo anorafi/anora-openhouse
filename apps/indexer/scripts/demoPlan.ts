@@ -56,6 +56,30 @@ export function demoPlan(chain: DemoChain): FacilitySpec[] {
   ];
 }
 
+const sizedOpen = (name: string, company: string, route: string, type: string, icon: string, days: number, metadata: MetadataMode): FacilitySpec => ({
+  kind: "open", name, company, route, type, icon,
+  limit: usdc(20_000), firstLoss: usdc(4_000), feePct: 6, tenorSeconds: days * DAY, graceSeconds: 14 * DAY,
+  junior: 0, senior: 0, draw: 0, metadata,
+});
+
+const sizedFunded = (kind: Kind, name: string, company: string, route: string, type: string, icon: string, tenorSeconds: number, graceSeconds: number): FacilitySpec => ({
+  kind, name, company, route, type, icon,
+  limit: usdc(10_000), firstLoss: usdc(2_000), feePct: 5, tenorSeconds, graceSeconds,
+  junior: usdc(2_000), senior: usdc(4_000), draw: usdc(6_000), metadata: null,
+});
+
+export function sizedPlan(chain: DemoChain): FacilitySpec[] {
+  if (chain !== "sepolia") throw new Error("the sized plan is for the testnet only");
+  return [
+    sizedOpen("Mekong Rubber Consignment 81", "Mekong Rubber JSC", "Vietnam → South Korea", "Commodity finance", "◍", 60, "anchored"),
+    sizedOpen("Sihanoukville Rice Cargo 82", "Angkor Grain Co., Ltd.", "Cambodia → China", "Commodity finance", "♨", 90, "pending"),
+    sizedOpen("Surabaya Coffee Forward 83", "PT Kopi Timur Nusantara", "Indonesia → South Korea", "Export receivables", "☕", 120, null),
+    sizedFunded("late", "Cebu Shrimp Export 84", "Cebu Marine Foods Corporation", "Philippines → Japan", "Export receivables", "◐", 120, 90),
+    sizedFunded("late", "Colombo Tea Auction 85", "Ceylon Highlands (Pvt) Ltd", "Sri Lanka → United Kingdom", "Export receivables", "◒", 120, 90),
+    sizedFunded("active", "Karachi Textile Shipment 86", "Indus Textile Industries (Pvt) Ltd", "Pakistan → Turkey", "Commodity finance", "▤", 90 * DAY, 14 * DAY),
+  ];
+}
+
 export function lockedInOpen(plan: FacilitySpec[]) {
   return plan.filter((spec) => spec.kind === "open").reduce((sum, spec) => sum + spec.firstLoss, 0);
 }
