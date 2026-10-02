@@ -15,6 +15,7 @@ const shotDir = process.env.VERIFY_SHOTS ?? "/home/dims/.cache/claude-work/verif
 const transport = http(sepolia.rpcUrls.default.http[0]);
 const publicClient = createPublicClient({ chain: sepolia, transport });
 const deployer = privateKeyToAccount(process.env.DEPLOYER_PRIVATE_KEY);
+const owner = privateKeyToAccount(process.env.SEPOLIA_OWNER_PRIVATE_KEY);
 const fresh = privateKeyToAccount(generatePrivateKey());
 const asset = deployments.asset;
 const erc20 = parseAbi(["function balanceOf(address) view returns (uint256)", "function mint(address,uint256)"]);
@@ -36,7 +37,8 @@ mkdirSync(shotDir, { recursive: true });
 const deployerClient = createWalletClient({ account: deployer, chain: sepolia, transport });
 const fund = await deployerClient.sendTransaction({ to: fresh.address, value: 1_000_000_000_000_000n });
 await publicClient.waitForTransactionReceipt({ hash: fund });
-const approve = await deployerClient.writeContract({ address: deployments.AnoraFactory, abi: factoryAbi, functionName: "setOriginatorApproved", args: [fresh.address, true] });
+const ownerClient = createWalletClient({ account: owner, chain: sepolia, transport });
+const approve = await ownerClient.writeContract({ address: deployments.AnoraFactory, abi: factoryAbi, functionName: "setOriginatorApproved", args: [fresh.address, true] });
 await publicClient.waitForTransactionReceipt({ hash: approve });
 record("wallet originator baru disetujui owner di factory aktif", await publicClient.readContract({ address: deployments.AnoraFactory, abi: factoryAbi, functionName: "approvedOriginators", args: [fresh.address] }), fresh.address);
 console.log(`wallet baru ${fresh.address}, saldo awal ${await balanceOf(fresh.address)}`);
