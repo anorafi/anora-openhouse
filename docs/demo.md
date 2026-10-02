@@ -9,6 +9,8 @@ Curated facilities for the submission demo. Robinhood Chain is the default netwo
 | Robinhood Chain (4663, USDG) | `0x2Db15442C0242c5A0498E6Ff58a37e86E2d63692` |
 | Arbitrum Sepolia (421614, TestUSDC) | `0x6D051e17Be86CC7e3f24AbAf1393028c5B800c83` |
 
+Opening a facility on Arbitrum Sepolia needs no approval from us: the page approves the connected wallet automatically through the indexer (see Self-serve in `docs/operations.md`). On Robinhood the factory owner still approves originators by hand. The Sepolia factory owner is `0x845b2fcEd375929b34017106463b4aCb2D9ca099`; the old owner (deployer) no longer owns it.
+
 ## Robinhood facilities
 
 | Kind | Name | Address |
