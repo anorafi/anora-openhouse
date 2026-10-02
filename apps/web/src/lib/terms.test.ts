@@ -7,7 +7,6 @@ import {
   termsLabel,
   termsValid,
   toSeconds,
-  unitsFor,
 } from "./terms";
 
 describe("toSeconds", () => {
@@ -30,14 +29,6 @@ describe("presets", () => {
   test("offers short demo presets in minutes", () => {
     expect(TENOR_PRESETS.minutes).toEqual([2, 3, 5]);
     expect(GRACE_PRESETS.minutes).toEqual([1, 2]);
-  });
-});
-
-describe("unitsFor", () => {
-  test("allows the demo unit only when the asset has a faucet", () => {
-    expect(unitsFor(true)).toEqual(["days", "minutes"]);
-    expect(unitsFor(false)).toEqual(["days"]);
-    expect(unitsFor(undefined)).toEqual(["days"]);
   });
 });
 
