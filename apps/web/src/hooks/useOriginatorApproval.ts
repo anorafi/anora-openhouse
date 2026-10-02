@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAccount, useChainId, useReadContract } from "wagmi";
 import { factoryContract, ZERO_ADDRESS } from "../config/contracts";
 import { approvalNotice, requestApproval, shouldRequestApproval, type ApprovalState } from "../lib/selfServe";
@@ -18,23 +18,25 @@ export function useOriginatorApproval() {
     query: { enabled: selfServe && !!address && !!deployment?.factory },
   });
 
-  useEffect(() => setState("idle"), [address, chainId]);
+  const session = useRef(0);
+
+  useEffect(() => {
+    session.current += 1;
+    setState("idle");
+  }, [address, chainId]);
 
   const known = approved.isSuccess ? Boolean(approved.data) : undefined;
   const request = shouldRequestApproval({ selfServe, connected: !!address, approved: known, state });
 
   useEffect(() => {
     if (!request || !address || !deployment?.indexerApi) return;
-    let live = true;
+    const mine = session.current;
     setState("pending");
     void requestApproval(fetch, deployment.indexerApi, chainId, address).then(async (result) => {
-      if (!live) return;
+      if (session.current !== mine) return;
       if (result.ok) await approved.refetch();
-      if (live) setState(result.ok ? "done" : "failed");
+      if (session.current === mine) setState(result.ok ? "done" : "failed");
     });
-    return () => {
-      live = false;
-    };
   }, [request, address, chainId]);
 
   return { notice: approvalNotice(state), pending: state === "pending" };
