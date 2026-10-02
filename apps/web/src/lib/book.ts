@@ -237,5 +237,5 @@ export function realizedReturn(facility: Pick<Facility, "stage" | "holding">) {
 export interface DraftSize { min: number; max: number; step: number }
 
 export function draftSizeFor(faucet: boolean): DraftSize {
-  return faucet ? { min: 150_000, max: 600_000, step: 10_000 } : { min: 10, max: 20, step: 1 };
+  return faucet ? { min: 5_000, max: 20_000, step: 1_000 } : { min: 10, max: 20, step: 1 };
 }

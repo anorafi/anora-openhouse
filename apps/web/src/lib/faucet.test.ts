@@ -3,7 +3,7 @@ import { FAUCET_AMOUNT, faucetVisible } from "./faucet";
 
 describe("faucet", () => {
   test("hands out one fixed amount per click", () => {
-    expect(FAUCET_AMOUNT).toBe(1000);
+    expect(FAUCET_AMOUNT).toBe(10_000);
   });
 
   test("shows only for a connected wallet on a network whose asset has a faucet and allows writes", () => {
