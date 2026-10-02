@@ -2,12 +2,10 @@ import { TokenAmount } from "./TokenAmount";
 import { useMemo, useState, type CSSProperties } from "react";
 import { AmountInput } from "./AmountInput";
 import { FilterBar, presentOptions } from "./FilterBar";
-import { FaucetButton } from "./FaucetButton";
-import { useDeployment } from "../hooks/useDeployment";
 import { useTx } from "../hooks/useTx";
 import { trancheStructure, type TrancheStructure as Structure } from "../lib/tranche";
 import { planFacility } from "../lib/facilityPlan";
-import { FACILITY_DEFAULTS, GRACE_PRESETS, TENOR_PRESETS, defaultTerms, termsLabel, termsValid, toSeconds, unitsFor, type TenorUnit } from "../lib/terms";
+import { FACILITY_DEFAULTS, GRACE_PRESETS, TENOR_PRESETS, termsLabel, termsValid, toSeconds } from "../lib/terms";
 import { fundingState, DEFAULT_STAGES, ORIGINATOR_ACTION, STAGE_LABEL, eventTime, isMine, owedOn, waterfallOf, randomDraft, useBook, useDraftSize, useMoney, useRiskModel, type BookEvent, type Facility, type Stage } from "../state/book";
 
 /** Protocol-level floor, mirroring minFirstLossBps on the factory. */
@@ -436,7 +434,6 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
   const usd = useMoney();
   const size = useDraftSize();
   const risk = useRiskModel();
-  const units = unitsFor(useDeployment()?.faucet);
   const tx = useTx();
   const [form, setForm] = useState(() => randomDraft(facilities.map((facility) => facility.name), size));
   const [phase, setPhase] = useState<OpenPhase>("approve");
@@ -519,13 +516,10 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
         <label>First-loss stake<AmountInput value={form.firstLoss} onChange={set("firstLoss")} suffix={symbol} action={<button onClick={() => set("firstLoss")(String(Math.ceil(minFirstLoss)))}>Min</button>} /></label>
         <p className="balance-row"><span>Protocol floor ({MIN_FIRST_LOSS_BPS / 100}%)</span><strong><TokenAmount value={minFirstLoss} asset={symbol} /></strong></p>
         <p className="balance-row"><span>Wallet balance</span><strong><TokenAmount value={balance} asset={symbol} /></strong></p>
-        <FaucetButton />
         <TrancheStructure total={limitValue} asset={symbol} structure={draftStructure} />
         <div className="field-pair">
           <label>Financing fee<div className="amount-input"><input inputMode="decimal" value={form.feePct} onChange={(e) => set("feePct")(e.target.value)} /><span>%</span></div></label>
-          <label>Duration<div className="amount-input"><input inputMode="numeric" value={form.duration} onChange={(e) => set("duration")(e.target.value.replace(/\D/g, ""))} />{units.length > 1
-            ? <select className="unit-select" aria-label="Duration unit" value={form.unit} onChange={(e) => setForm((prev) => ({ ...prev, ...defaultTerms(e.target.value as TenorUnit) }))}>{units.map((unit) => <option key={unit} value={unit}>{unit === "days" ? "days" : "demo minutes"}</option>)}</select>
-            : <span>days</span>}</div></label>
+          <label>Duration<div className="amount-input"><input inputMode="numeric" value={form.duration} onChange={(e) => set("duration")(e.target.value.replace(/\D/g, ""))} /><span>days</span></div></label>
         </div>
         <div className="preset-row" aria-label="Duration presets">{TENOR_PRESETS[form.unit].map((preset) => <button key={preset} className={String(preset) === form.duration ? "active" : ""} onClick={() => set("duration")(String(preset))}>{preset} {form.unit}</button>)}</div>
         <label>Grace before default<div className="amount-input"><input inputMode="numeric" value={form.grace} onChange={(e) => set("grace")(e.target.value.replace(/\D/g, ""))} /><span>{form.unit}</span></div></label>

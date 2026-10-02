@@ -24,10 +24,6 @@ export function toSeconds(value: number, unit: TenorUnit) {
   return Math.round(value * SECONDS[unit]);
 }
 
-export function unitsFor(faucet: boolean | undefined): TenorUnit[] {
-  return faucet ? ["days", "minutes"] : ["days"];
-}
-
 export function defaultTerms(unit: TenorUnit): Terms {
   return unit === "days" ? { unit, duration: "90", grace: "14" } : { unit, duration: "2", grace: "1" };
 }

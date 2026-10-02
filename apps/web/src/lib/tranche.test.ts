@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { holdingTranches, trancheIndex, trancheReturn, trancheStructure } from "./tranche";
+import { holdingTranches, trancheIndex, trancheProtectionCopy, trancheReturn, trancheStructure } from "./tranche";
 
 const input = { limit: 10, firstLoss: 3, seniorPerJuniorBps: 22_500, seniorAssets: 0, juniorAssets: 0 };
 
@@ -68,6 +68,14 @@ describe("trancheIndex", () => {
   it("maps each tranche to the contract enum value", () => {
     expect(trancheIndex("senior")).toBe(0);
     expect(trancheIndex("junior")).toBe(1);
+  });
+});
+
+describe("trancheProtectionCopy", () => {
+  it("describes the protection actually ahead of the selected tranche", () => {
+    expect(trancheProtectionCopy("junior", 2)).toMatch(/first-loss stake.*before Junior.*before Senior/i);
+    expect(trancheProtectionCopy("senior", 2)).toMatch(/first-loss stake and funded Junior capital.*before Senior/i);
+    expect(trancheProtectionCopy("senior", 0)).not.toMatch(/Junior capital/);
   });
 });
 

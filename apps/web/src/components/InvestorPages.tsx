@@ -1,6 +1,5 @@
 import { repaymentProjection } from "../lib/repaymentProjection";
-import { holdingTranches, trancheReturn, type Tranche } from "../lib/tranche";
-import { FaucetButton } from "./FaucetButton";
+import { holdingTranches, trancheProtectionCopy, trancheReturn, type Tranche } from "../lib/tranche";
 import { TokenAmount } from "./TokenAmount";
 import { useMemo, useState, type CSSProperties } from "react";
 import type { Market } from "./Markets";
@@ -138,6 +137,7 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
   };
   const validAmount = Number.isFinite(value) && value > 0 && value <= Math.min(balance, availableValue) && market.accepting && !!me;
   const reservePct = tranche === "senior" ? toNumber(market.reserve) : market.firstLossPct;
+  const protectionCopy = trancheProtectionCopy(tranche, market.juniorSupplied);
   const review = facilityReview(market);
   const remote = useFacilityReview(market.id);
   const record = remote.metadata.data?.kind === "record" ? remote.metadata.data.record : null;
@@ -150,7 +150,7 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
       <aside className="supply-panel">
         {phase === "form" && <>
           <h2>Supply</h2>
-          <p className="panel-copy">Provide capital to the {TRANCHE_LABEL[tranche]} tranche to earn a {percentText(targetReturnPct)} target return.</p>
+          <p className="panel-copy">Provide capital to the {TRANCHE_LABEL[tranche]} tranche with a target return of {percentText(targetReturnPct)}.</p>
           <div className="tranche-picker" role="radiogroup" aria-label="Tranche">
             {(["senior", "junior"] as const).map((option) => <button
               key={option}
@@ -161,10 +161,9 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
               onClick={() => pickTranche(option)}
             >{TRANCHE_LABEL[option]}</button>)}
           </div>
-          {tranche === "junior" && <p className="tranche-note">Junior absorbs losses right after the originator's first-loss stake, before Senior.</p>}
+          <p className="tranche-note">{protectionCopy}</p>
           <label>Asset<select><option>{market.asset}</option></select></label>
           <p className="balance-row"><span>Wallet balance</span><strong>{me ? <TokenAmount value={balance} asset={market.asset} /> : "Connect a wallet"}</strong></p>
-          <FaucetButton />
           <label>Amount<AmountInput value={amount} onChange={setAmount} suffix={market.asset} action={<button onClick={() => setAmount(String(Math.min(balance, availableValue)))}>Max</button>} /></label>
           <dl className="supply-totals"><div><dt>Estimated repayment</dt><dd><TokenAmount value={repayment} asset={market.asset} /></dd></div><div><dt>Estimated return</dt><dd><TokenAmount value={Math.max(0, repayment - value)} asset={market.asset} /></dd></div></dl>
           {value > 0 && value > availableValue && <p className="facility-warn">Only <TokenAmount value={availableValue} asset={market.asset} /> is open to supply.</p>}
@@ -222,7 +221,13 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
           <small>Your position now tracks this facility until the originator repays.</small>
         </div>}
       </aside>
-      <section className="market-detail-panel"><dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{market.targetReturn}</dd></div><div><dt>Available to invest</dt><dd><TokenAmount value={availableValue} asset={market.asset} /></dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection reserve</dt><dd>{market.reserve}</dd></div></dl><div className="detail-section"><header><strong>Funding</strong><span>{market.fundingLabel}</span></header>{market.accepting && <progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress>}</div><div className="detail-section"><header><strong>Protection before your position</strong><span>{percentText(reservePct)} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{percentText(reservePct)}</span><span>{percentText(Math.max(0, 100 - reservePct))}</span></div><div className="detail-section-footer"><p>{tranche === "senior" ? "The reserve absorbs losses before your position." : "Only the first-loss stake absorbs losses before your position."}</p><button className="text-link" onClick={() => setReviewPanel("risk")}>View risk and underwriting</button></div></div><div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>{market.asset}</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>{label ? label.text : remote.api && remote.metadata.isError ? "METADATA_UNAVAILABLE" : "Sample, not verified"}</dd></div></dl></div><div className="inline-links"><button onClick={() => setReviewPanel("documents")}>Facility documents</button><button>Transaction history</button></div></section>
+      <section className="market-detail-panel">
+        <dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{percentText(targetReturnPct)}</dd></div><div><dt>Available to invest</dt><dd><TokenAmount value={availableValue} asset={market.asset} /></dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection before position</dt><dd>{percentText(reservePct)}</dd></div></dl>
+        <div className="detail-section"><header><strong>Funding</strong><span>{market.fundingLabel}</span></header>{market.accepting && <progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress>}</div>
+        <div className="detail-section"><header><strong>Protection before your position</strong><span>{percentText(reservePct)} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{percentText(reservePct)}</span><span>{percentText(Math.max(0, 100 - reservePct))}</span></div><div className="detail-section-footer"><p>{protectionCopy}</p><button className="text-link" onClick={() => setReviewPanel("risk")}>View risk and underwriting</button></div></div>
+        <div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>{market.asset}</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>{label ? label.text : remote.api && remote.metadata.isError ? "METADATA_UNAVAILABLE" : "Sample, not verified"}</dd></div></dl></div>
+        <div className="inline-links"><button onClick={() => setReviewPanel("documents")}>Facility documents</button><button>Transaction history</button></div>
+      </section>
     </div>
     {reviewPanel && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setReviewPanel(null); }}><div className="modal facility-review-modal" role="dialog" aria-modal="true" aria-labelledby="facility-review-title">
       <button className="modal-close" aria-label="Close" onClick={() => setReviewPanel(null)}>×</button>

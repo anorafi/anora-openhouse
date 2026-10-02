@@ -4,6 +4,7 @@ import { orderedNetworks } from "../config/chains";
 import { useManifest } from "../config/ManifestContext";
 import { useIsRiskAgent } from "../hooks/useFactory";
 import { shortenAddress } from "../lib/format";
+import { FaucetButton } from "./FaucetButton";
 
 /** Close an open popover when the next click lands outside it. */
 function useDismiss(open: boolean, setOpen: (open: boolean) => void) {
@@ -45,6 +46,7 @@ export function Header() {
   return (
     <header className="header">
       <div className="header-actions">
+        <FaucetButton />
         <div className="network-select" ref={menuRef}>
           <button type="button" className="network-current" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={menuOpen}>
             <span className="network-dot" aria-hidden="true" />
