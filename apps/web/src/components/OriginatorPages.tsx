@@ -2,7 +2,6 @@ import { TokenAmount } from "./TokenAmount";
 import { useMemo, useState, type CSSProperties } from "react";
 import { AmountInput } from "./AmountInput";
 import { FilterBar, presentOptions } from "./FilterBar";
-import { FaucetButton } from "./FaucetButton";
 import { useDeployment } from "../hooks/useDeployment";
 import { useTx } from "../hooks/useTx";
 import { trancheStructure, type TrancheStructure as Structure } from "../lib/tranche";
@@ -519,7 +518,6 @@ export function OpenFacility({ onOpened }: { onOpened: () => void }) {
         <label>First-loss stake<AmountInput value={form.firstLoss} onChange={set("firstLoss")} suffix={symbol} action={<button onClick={() => set("firstLoss")(String(Math.ceil(minFirstLoss)))}>Min</button>} /></label>
         <p className="balance-row"><span>Protocol floor ({MIN_FIRST_LOSS_BPS / 100}%)</span><strong><TokenAmount value={minFirstLoss} asset={symbol} /></strong></p>
         <p className="balance-row"><span>Wallet balance</span><strong><TokenAmount value={balance} asset={symbol} /></strong></p>
-        <FaucetButton />
         <TrancheStructure total={limitValue} asset={symbol} structure={draftStructure} />
         <div className="field-pair">
           <label>Financing fee<div className="amount-input"><input inputMode="decimal" value={form.feePct} onChange={(e) => set("feePct")(e.target.value)} /><span>%</span></div></label>

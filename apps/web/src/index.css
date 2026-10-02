@@ -730,7 +730,8 @@ progress::-moz-progress-bar { background: var(--fill); border-radius: 999px; }
 .risk-page .error { color: #c53a3a; }
 .risk-page .muted { color: var(--muted); }
 
-.faucet-row { margin: -10px 0 18px; }
+.faucet-row { display: flex; align-items: center; gap: 8px; }
+.faucet-row .facility-warn { margin: 0; }
 .preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
 .preset-row button { padding: 4px 10px; color: var(--muted); background: transparent; border: 1px solid var(--line-strong); border-radius: 999px; font-size: 12px; }
 .preset-row button.active { color: var(--ink); border-color: var(--ink); }
