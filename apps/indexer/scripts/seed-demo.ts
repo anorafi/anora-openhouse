@@ -6,10 +6,11 @@ import { AnoraFacilityAbi } from "../../web/src/abi/AnoraFacility";
 import { AnoraFactoryAbi } from "../../web/src/abi/AnoraFactory";
 import { TestUSDCAbi } from "../../web/src/abi/TestUSDC";
 import { encodeFacilityName } from "../../web/src/lib/facilityName";
-import { demoPlan, lockedInOpen, usdc, validatePlan, type DemoChain, type FacilitySpec } from "./demoPlan";
+import { demoPlan, lockedInOpen, sizedPlan, usdc, validatePlan, type DemoChain, type FacilitySpec } from "./demoPlan";
 import { metadataApi } from "./metadataApi";
 
 const target = (process.env.CHAIN ?? "robinhood") as DemoChain;
+const profile = process.env.PROFILE === "sized" ? "sized" : "curated";
 const robinhood = defineChain({
   id: 4663,
   name: "Robinhood Chain",
@@ -87,19 +88,19 @@ async function snapshot() {
   return out;
 }
 
-const plan = demoPlan(target);
+const plan = profile === "sized" ? sizedPlan(target) : demoPlan(target);
 validatePlan(plan);
 const firstLossTotal = plan.reduce((sum, spec) => sum + spec.firstLoss, 0);
 const investorNeed = plan.filter((spec) => spec.kind !== "open").reduce((sum, spec) => sum + spec.junior + spec.senior, 0);
 const before = await snapshot();
 log("ledger-before", before);
-log("plan", { chain: target, factory, asset, facilities: plan.length, lockedInOpen: lockedInOpen(plan), firstLossTotal, investorNeed });
+log("plan", { profile, chain: target, factory, asset, facilities: plan.length, lockedInOpen: lockedInOpen(plan), firstLossTotal, investorNeed });
 
 if (!(await read<boolean>(factory, AnoraFactoryAbi, "approvedOriginators", [originator.address]))) throw new Error("originator is not approved on the factory");
 if ((await read<string>(factory, AnoraFactoryAbi, "riskAgent")).toLowerCase() !== reviewer.address.toLowerCase()) throw new Error("risk agent mismatch on the factory");
 
 await ensureGas();
-await ensureAssetBalance(originator, firstLossTotal + usdc(0.3));
+await ensureAssetBalance(originator, firstLossTotal + (profile === "sized" ? usdc(20_000) : usdc(0.3)));
 await ensureAssetBalance(investor, investorNeed);
 
 const created = new Map<FacilitySpec, Address>();
@@ -149,8 +150,8 @@ async function claim(spec: FacilitySpec) {
 for (const spec of timed) await fund(spec);
 for (const spec of others) await fund(spec);
 
-const repaid = plan.find((spec) => spec.kind === "repaid")!;
-{
+const repaid = plan.find((spec) => spec.kind === "repaid");
+if (repaid) {
   const address = created.get(repaid)!;
   const owed = await read<bigint>(address, AnoraFacilityAbi, "owed");
   await ensureAllowance(originator, address, Number(owed) + 1);
@@ -159,8 +160,8 @@ const repaid = plan.find((spec) => spec.kind === "repaid")!;
   log("repaid-cycle", { address, owed: owed.toString(), facilityBalance: (await balanceOf(address)).toString() });
 }
 
-const recovered = plan.find((spec) => spec.kind === "recovered")!;
-{
+const recovered = plan.find((spec) => spec.kind === "recovered");
+if (recovered) {
   const address = created.get(recovered)!;
   const dueAt = Number(await read<bigint>(address, AnoraFacilityAbi, "dueAt"));
   while ((await now()) <= dueAt) await sleep(5_000);
@@ -213,5 +214,5 @@ const after = await snapshot();
 log("ledger-after", after);
 const facilities = [...created.entries()].map(([spec, address]) => ({ kind: spec.kind, name: spec.name, address }));
 const summary = { chain: target, factory, before, after, facilities };
-writeFileSync(`${process.env.HOME}/.cache/claude-work/seed-${target}.json`, JSON.stringify(summary, null, 2));
+writeFileSync(`${process.env.HOME}/.cache/claude-work/seed-${target}${profile === "sized" ? "-sized" : ""}.json`, JSON.stringify(summary, null, 2));
 log("done", { facilities: facilities.length });

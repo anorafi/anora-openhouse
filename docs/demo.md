@@ -35,6 +35,35 @@ Curated facilities for the submission demo. Robinhood Chain is the default netwo
 
 Kinds: open = open for supply, tenor 60/90/120 days, active = drawn, repayable by the originator, late = past due, marked late by the keeper, recovered = defaulted, fully recovered, claimed, repaid = full cycle: supply, draw, repay, claim. Two Open facilities on Robinhood carry an approved and anchored underwriting record and one is a sample; on Sepolia one is anchored, one is approved but not anchored, one is a sample.
 
+## Sepolia: sized demo and spare facilities (2 Oct 2026)
+
+The curated set above uses very small amounts. For the recording, Sepolia also has a sized set, seeded with `PROFILE=sized`, and a faucet that gives 10,000 TestUSDC per claim (the default draft in the open-facility form is 5,000 to 20,000, so one claim covers its first-loss).
+
+| Kind | Name | Address | Notes |
+|---|---|---|---|
+| open | Mekong Rubber Consignment 81 | `0xe1667Ca261622288bDfd816a7A19c6035c12B38C` | limit 20,000, first-loss 4,000, underwriting approved and anchored. Holds 6,000 TestUSDC of test deposits from the browser checks |
+| open | Sihanoukville Rice Cargo 82 | `0x6D6f62D5591E3c18daF0F1B2Daa4538ed04cAcb4` | limit 20,000, first-loss 4,000, approved but not anchored. Untouched |
+| open | Surabaya Coffee Forward 83 | `0xf7FF52Daf2B0d761e15722E988a2c18e024C3466` | limit 20,000, first-loss 4,000, no record (sample label). Untouched |
+| late (spare) | Cebu Shrimp Export 84 | `0x9352E9Cc75d0b19aDd6Ae1ddBB26Cb07f6a8A0EC` | tenor 120 s, grace 90 s, drawn 6,000. Marked late by the keeper; not defaulted, not repaid |
+| late (spare) | Colombo Tea Auction 85 | `0xbd08BDADC018B9Af94526a73D1d7C934922F6F17` | same as above |
+| active (spare) | Karachi Textile Shipment 86 | `0x99B4E0Ba038EF50E6D511F15F9aEb23385301409` | tenor 90 days, drawn 6,000, not repaid |
+
+Open facilities have Senior capacity 9,000 (2.25 times the first-loss) and up to 16,000 of Junior room, so a Senior and a Junior supply of 1,000 each updates the portfolio visibly.
+
+### Recording a transition on chain
+
+The spare facilities are there so that a transition can be done live instead of waiting for time to pass. Each step is a real transaction:
+
+- Default: the grace period of the two late facilities is already over. The risk agent wallet declares default with a reason, then the originator wallet remits the recovery and the supplier claims.
+- Repayment: the originator wallet repays 6,300 (6,000 principal and 5 percent fee) on the active facility or on a late one, then the supplier claims. The demo originator holds enough TestUSDC for it.
+- Signers: the risk agent wallet for default, the originator wallet for repay and recovery, the investor wallet for claims.
+
+```bash
+secret with anora-openhouse -- env CHAIN=sepolia PROFILE=sized bun run apps/indexer/scripts/seed-demo.ts
+```
+
+Running it again adds a new set with the same names, so change the numbers in `sizedPlan` first.
+
 ## Repeat the seed
 
 The plan lives in `apps/indexer/scripts/demoPlan.ts` (checked by `demoPlan.test.ts`: first loss at least 10 percent of the limit, Senior within capacity, at most 2 USDG locked in Open facilities). The seed creates new facilities on every run, so run it once per factory.

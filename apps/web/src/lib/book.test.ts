@@ -190,7 +190,7 @@ describe("provider view of a facility", () => {
 
 describe("draftSizeFor", () => {
   it("uses testnet-scale drafts for an asset with a faucet", () => {
-    expect(draftSizeFor(true)).toEqual({ min: 150_000, max: 600_000, step: 10_000 });
+    expect(draftSizeFor(true)).toEqual({ min: 5_000, max: 20_000, step: 1_000 });
   });
 
   it("keeps drafts small when the asset is real money", () => {
