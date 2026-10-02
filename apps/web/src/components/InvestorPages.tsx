@@ -114,7 +114,7 @@ function StepRail({ step, complete = false }: { step: number; complete?: boolean
 type Phase = "form" | "approve" | "supply" | "done";
 
 const TRANCHE_LABEL: Record<Tranche, string> = { senior: "Senior", junior: "Junior" };
-export const trancheAvailable = (market: Market, tranche: Tranche) => (tranche === "senior" ? market.seniorAvailable : market.juniorAvailable);
+const trancheAvailable = (market: Market, tranche: Tranche) => (tranche === "senior" ? market.seniorAvailable : market.juniorAvailable);
 const percentText = (value: number) => `${Number(value.toFixed(2))}%`;
 
 export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { market: Market; onBack: () => void; onApprove: (amount: number) => Promise<void>; onSupply: (amount: number, tranche: Tranche) => Promise<void>; onDone: () => void }) {
@@ -122,7 +122,6 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
   const tx = useTx();
   const [tranche, setTranche] = useState<Tranche>(() => (market.seniorAvailable > 0 || market.juniorAvailable <= 0 ? "senior" : "junior"));
   const availableValue = trancheAvailable(market, tranche);
-  const otherTranche: Tranche = tranche === "senior" ? "junior" : "senior";
   const [amount, setAmount] = useState(() => String(Math.min(availableValue, balance) || availableValue));
   const [phase, setPhase] = useState<Phase>("form");
   const [acceptedRisk, setAcceptedRisk] = useState(false);
@@ -158,6 +157,7 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
               role="radio"
               aria-checked={tranche === option}
               className={tranche === option ? "active" : ""}
+              disabled={trancheAvailable(market, option) <= 0}
               onClick={() => pickTranche(option)}
             >{TRANCHE_LABEL[option]}</button>)}
           </div>
@@ -166,7 +166,6 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
           <p className="balance-row"><span>Wallet balance</span><strong>{me ? <TokenAmount value={balance} asset={market.asset} /> : "Connect a wallet"}</strong></p>
           <label>Amount<AmountInput value={amount} onChange={setAmount} suffix={market.asset} action={<button onClick={() => setAmount(String(Math.min(balance, availableValue)))}>Max</button>} /></label>
           <dl className="supply-totals"><div><dt>Estimated repayment</dt><dd><TokenAmount value={repayment} asset={market.asset} /></dd></div><div><dt>Estimated return</dt><dd><TokenAmount value={Math.max(0, repayment - value)} asset={market.asset} /></dd></div></dl>
-          {availableValue <= 0 && <p className="facility-warn">{TRANCHE_LABEL[tranche]} tranche is fully funded. {trancheAvailable(market, otherTranche) > 0 ? `Choose ${TRANCHE_LABEL[otherTranche]} to continue.` : "Choose another facility."}</p>}
           {value > 0 && value > availableValue && <p className="facility-warn">Only <TokenAmount value={availableValue} asset={market.asset} /> is open to supply.</p>}
           {value > balance && value <= availableValue && <p className="facility-warn">More than your wallet balance.</p>}
           <button className="accent-button wide" disabled={!validAmount} onClick={() => setPhase("approve")}>Review supply</button>
