@@ -10,7 +10,7 @@ const robinhood = defineChain({
   rpcUrls: { default: { http: [process.env.ROBINHOOD_RPC ?? "https://rpc.mainnet.chain.robinhood.com"] } },
 });
 
-const url = process.env.SMOKE_URL ?? "https://openhouse.anora.finance/";
+const url = process.env.SMOKE_URL ?? "https://anora.finance/";
 const shotDir = process.env.SMOKE_SHOTS ?? "/home/dims/.cache/claude-work/smoke";
 const paths = (process.env.SMOKE_PATHS ?? "repaid,default").split(",");
 const transport = http(robinhood.rpcUrls.default.http[0]);

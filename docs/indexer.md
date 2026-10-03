@@ -25,7 +25,7 @@ systemctl --user restart anora-indexer
 | `INDEXER_MAX_LAG` | `400` | blocks behind the head before data routes answer `INDEXER_BEHIND` |
 | `INDEXER_CHUNK` | `2000` | blocks per `getLogs` request; halves on failure, minimum 10 |
 | `INDEXER_REORG_WINDOW` | `128` | recent blocks whose hashes are re-checked each round |
-| `INDEXER_ORIGINS` | `https://openhouse.anora.finance` | extra allowed CORS origins, comma separated; `http://127.0.0.1:*` and `http://localhost:*` are always allowed |
+| `INDEXER_ORIGINS` | `https://anora.finance,https://www.anora.finance,https://openhouse.anora.finance` | extra allowed CORS origins, comma separated; `http://127.0.0.1:*` and `http://localhost:*` are always allowed |
 
 ## Sync
 

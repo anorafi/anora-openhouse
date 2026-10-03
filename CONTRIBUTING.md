@@ -19,7 +19,7 @@ bun run dev:web
 - Tests first when there is logic to test. No explanatory comments; make the names carry it.
 - Commits: short, English, conventional style (`feat(web): ...`, `fix: ...`, `chore: ...`). One cluster per commit.
 - Contract changes need a redeploy: `forge script script/Deploy.s.sol --rpc-url $ARBITRUM_SEPOLIA_RPC --private-key $DEPLOYER_PRIVATE_KEY --broadcast`, then update `deployments.json`, `contracts.ts`, README, and re-export ABIs.
-- Web deploy to https://openhouse.anora.finance is done from the VPS with `bin/deploy-web.sh` (ask Dimas).
+- Web deploy to https://anora.finance is done from the VPS with `bin/deploy-web.sh` (ask Dimas).
 
 ## Verifying on Robinhood Chain Blockscout
 

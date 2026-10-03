@@ -2,7 +2,7 @@
 
 **Bringing trade-backed yield onchain, uncorrelated with crypto markets.**
 
-[Live demo](https://openhouse.anora.finance)
+[Live demo](https://anora.finance)
 
 Anora is a PayFi (Payment Finance) protocol building onchain rails between
 global capital and the real economy. Through isolated, programmable vaults,
@@ -111,7 +111,7 @@ bun run test:contracts
 
 ## apps/web
 
-Live demo build: https://openhouse.anora.finance (redeploy with `bin/deploy-web.sh`).
+Live demo build: https://anora.finance (redeploy with `bin/deploy-web.sh`).
 
 Vite + React + TypeScript with plain CSS and no UI framework. The latest
 routed capital-provider and originator experience is the approved product

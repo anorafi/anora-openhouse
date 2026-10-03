@@ -22,12 +22,12 @@ const intervalMs = Number(process.env.INDEXER_INTERVAL_MS ?? "5000");
 const maxLag = BigInt(process.env.INDEXER_MAX_LAG ?? "400");
 const chunk = BigInt(process.env.INDEXER_CHUNK ?? "2000");
 const reorgWindow = BigInt(process.env.INDEXER_REORG_WINDOW ?? "128");
-const origins = (process.env.INDEXER_ORIGINS ?? "https://openhouse.anora.finance").split(",");
+const origins = (process.env.INDEXER_ORIGINS ?? "https://anora.finance,https://www.anora.finance,https://openhouse.anora.finance").split(",");
 const dataDir = dirname(dbPath);
 const metaDbPath = process.env.META_DB ?? `${dataDir}/metadata.db`;
 const documentsDir = process.env.META_DOCUMENTS ?? `${dataDir}/documents`;
 const secretPath = process.env.META_SECRET_FILE ?? `${dataDir}/meta.secret`;
-const metaDomain = process.env.META_DOMAIN ?? "openhouse.anora.finance";
+const metaDomain = process.env.META_DOMAIN ?? "anora.finance";
 const maxFileBytes = Number(process.env.META_MAX_FILE_BYTES ?? String(5 * 1024 * 1024));
 
 const manifest = parseManifest(JSON.parse(readFileSync(manifestPath, "utf8")));
