@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { holdingTranches, trancheIndex, trancheProtectionCopy, trancheReturn, trancheStructure } from "./tranche";
+import { holdingTranches, trancheIndex, trancheProtection, trancheProtectionCopy, trancheReturn, trancheStructure } from "./tranche";
 
 const input = { limit: 10, firstLoss: 3, seniorPerJuniorBps: 22_500, seniorAssets: 0, juniorAssets: 0 };
 
@@ -76,6 +76,20 @@ describe("trancheProtectionCopy", () => {
     expect(trancheProtectionCopy("junior", 2)).toMatch(/first-loss stake.*before Junior.*before Senior/i);
     expect(trancheProtectionCopy("senior", 2)).toMatch(/first-loss stake and funded Junior capital.*before Senior/i);
     expect(trancheProtectionCopy("senior", 0)).not.toMatch(/Junior capital/);
+  });
+});
+
+describe("trancheProtection", () => {
+  it("shows only first-loss protection ahead of Junior", () => {
+    expect(trancheProtection("junior", 20, 35)).toEqual({ total: 20, firstLoss: 20, fundedJunior: 0 });
+  });
+
+  it("includes funded Junior capital ahead of Senior", () => {
+    expect(trancheProtection("senior", 20, 35)).toEqual({ total: 35, firstLoss: 20, fundedJunior: 15 });
+  });
+
+  it("does not invent Junior protection when none is funded", () => {
+    expect(trancheProtection("senior", 37.5, 37.5)).toEqual({ total: 37.5, firstLoss: 37.5, fundedJunior: 0 });
   });
 });
 
