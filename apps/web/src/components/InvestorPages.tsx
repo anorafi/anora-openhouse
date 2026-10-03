@@ -1,5 +1,5 @@
 import { repaymentProjection } from "../lib/repaymentProjection";
-import { holdingTranches, trancheProtectionCopy, trancheReturn, type Tranche } from "../lib/tranche";
+import { holdingTranches, trancheProtection, trancheProtectionCopy, trancheReturn, type Tranche } from "../lib/tranche";
 import { TokenAmount } from "./TokenAmount";
 import { useMemo, useState, type CSSProperties } from "react";
 import type { Market } from "./Markets";
@@ -136,8 +136,12 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
     setAmount(String(Math.min(room, balance) || room));
   };
   const validAmount = Number.isFinite(value) && value > 0 && value <= Math.min(balance, availableValue) && market.accepting && !!me;
-  const reservePct = tranche === "senior" ? toNumber(market.reserve) : market.firstLossPct;
+  const protection = trancheProtection(tranche, market.firstLossPct, toNumber(market.reserve));
+  const reservePct = protection.total;
   const protectionCopy = trancheProtectionCopy(tranche, market.juniorSupplied);
+  const protectionSummary = tranche === "senior"
+    ? `${percentText(protection.firstLoss)} first-loss + ${percentText(protection.fundedJunior)} funded Junior.`
+    : `${percentText(protection.firstLoss)} originator first-loss protection.`;
   const review = facilityReview(market);
   const remote = useFacilityReview(market.id);
   const record = remote.metadata.data?.kind === "record" ? remote.metadata.data.record : null;
@@ -184,7 +188,7 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
             <div><dt>Duration</dt><dd>{market.duration}</dd></div>
             <div><dt>Estimated repayment</dt><dd><TokenAmount value={repayment} asset={market.asset} /></dd></div>
             <div><dt>Estimated return</dt><dd className="positive"><TokenAmount value={Math.max(0, repayment - value)} asset={market.asset} /></dd></div>
-            <div><dt>Protection reserve</dt><dd>{percentText(reservePct)}</dd></div>
+            <div><dt>Protection before position</dt><dd>{percentText(reservePct)}</dd></div>
             <div><dt>Available afterward</dt><dd><TokenAmount value={Math.max(0, availableValue - value)} asset={market.asset} /></dd></div>
           </dl>
           <StepRail step={phase === "approve" ? 0 : 1} />
@@ -224,7 +228,7 @@ export function Opportunity({ market, onBack, onApprove, onSupply, onDone }: { m
       <section className="market-detail-panel">
         <dl className="opportunity-metrics"><div><dt>Target return</dt><dd>{percentText(targetReturnPct)}</dd></div><div><dt>Available to invest</dt><dd><TokenAmount value={availableValue} asset={market.asset} /></dd></div><div><dt>Duration</dt><dd>{market.duration}</dd></div><div><dt>Protection before position</dt><dd>{percentText(reservePct)}</dd></div></dl>
         <div className="detail-section"><header><strong>Funding</strong><span>{market.fundingLabel}</span></header>{market.accepting && <progress className="accent-progress" max="100" value={market.funded}>{market.funded}%</progress>}</div>
-        <div className="detail-section"><header><strong>Protection before your position</strong><span>{percentText(reservePct)} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{percentText(reservePct)}</span><span>{percentText(Math.max(0, 100 - reservePct))}</span></div><div className="detail-section-footer"><p>{protectionCopy}</p><button className="text-link" onClick={() => setReviewPanel("risk")}>View risk and underwriting</button></div></div>
+        <div className="detail-section"><header><strong>Protection before your position</strong><span>{percentText(reservePct)} absorbs losses before your capital.</span></header><div className="protection-bar" style={{ gridTemplateColumns: `${reservePct}fr ${Math.max(0, 100 - reservePct)}fr` }}><span>{percentText(reservePct)}</span><span>{percentText(Math.max(0, 100 - reservePct))}</span></div><p className="muted compact">{protectionSummary}</p><div className="detail-section-footer"><p>{protectionCopy}</p><button className="text-link" onClick={() => setReviewPanel("risk")}>View risk and underwriting</button></div></div>
         <div className="detail-section"><h2>Market overview</h2><dl className="detail-list"><div><dt>Financing type</dt><dd>{market.type}</dd></div><div><dt>Settlement asset</dt><dd>{market.asset}</dd></div><div><dt>Repayment</dt><dd>At maturity</dd></div><div><dt>Current state</dt><dd>{market.status}</dd></div><div><dt>Evidence status</dt><dd>{label ? label.text : remote.api && remote.metadata.isError ? "METADATA_UNAVAILABLE" : "Sample, not verified"}</dd></div></dl></div>
         <div className="inline-links"><button onClick={() => setReviewPanel("documents")}>Facility documents</button><button>Transaction history</button></div>
       </section>

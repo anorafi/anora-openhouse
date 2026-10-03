@@ -61,6 +61,12 @@ export function trancheReturn({ feePct, seniorFeeShareBps, tranche, amount, seni
 
 export const trancheIndex = (tranche: Tranche) => (tranche === "senior" ? 0 : 1);
 
+export function trancheProtection(tranche: Tranche, firstLossPct: number, seniorProtectionPct: number) {
+  const firstLoss = Math.max(0, Math.min(100, firstLossPct));
+  const total = tranche === "senior" ? Math.max(firstLoss, Math.min(100, seniorProtectionPct)) : firstLoss;
+  return { total, firstLoss, fundedJunior: tranche === "senior" ? total - firstLoss : 0 };
+}
+
 export function trancheProtectionCopy(tranche: Tranche, fundedJunior: number) {
   if (tranche === "junior") return "The originator's first-loss stake absorbs losses before Junior. Junior absorbs losses before Senior.";
   return fundedJunior > 0
